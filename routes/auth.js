@@ -1,6 +1,40 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../db');
+const crypto = require('crypto');
+
+// Professional Telegram initData verification
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8669833278:AAFHxzU9jZUZIWVrHdogUsYrkQmd_F05MZA';
+
+function verifyTelegramData(initData) {
+    if (!initData) return false;
+
+    try {
+        const urlParams = new URLSearchParams(initData);
+        const hash = urlParams.get('hash');
+        urlParams.delete('hash');
+
+        const sortedKeys = Array.from(urlParams.keys()).sort();
+        const dataCheckString = sortedKeys
+            .map(key => `${key}=${urlParams.get(key)}`)
+            .join('\n');
+
+        const secretKey = crypto
+            .createHmac('sha256', 'WebAppData')
+            .update(BOT_TOKEN)
+            .digest();
+
+        const generatedHash = crypto
+            .createHmac('sha256', secretKey)
+            .update(dataCheckString)
+            .digest('hex');
+
+        return generatedHash === hash;
+    } catch (e) {
+        console.error('Telegram sync verification error:', e);
+        return false;
+    }
+}
 
 /**
  * @swagger
@@ -206,10 +240,16 @@ router.post('/bus-login', async (req, res) => {
  *         description: Login successful
  */
 router.post('/telegram-login', async (req, res) => {
-    const { id, first_name, last_name, username, photo_url, userId } = req.body;
+    const { id, first_name, last_name, username, photo_url, userId, initData } = req.body;
 
     if (!id || !first_name) {
         return res.status(400).json({ error: 'Telegram ID and first_name are required' });
+    }
+
+    // Professional Verification
+    if (initData && !verifyTelegramData(initData)) {
+        console.error("Telegram Data Verification Failed for ID:", id);
+        return res.status(403).json({ error: 'Invalid Telegram data' });
     }
 
     try {
