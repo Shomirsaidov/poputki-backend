@@ -229,6 +229,7 @@ router.post('/telegram-login', async (req, res) => {
             const { data: updatedUser, error: updateError } = await supabase
                 .from('users')
                 .update({
+                    telegram_id: id,
                     photo_url: photo_url || user.photo_url,
                     username: username || user.username,
                     name: user.name || fullName // Only update name if it was empty
