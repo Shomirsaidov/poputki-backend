@@ -206,7 +206,7 @@ router.post('/bus-login', async (req, res) => {
  *         description: Login successful
  */
 router.post('/telegram-login', async (req, res) => {
-    const { id, first_name, last_name, username, photo_url } = req.body;
+    const { id, first_name, last_name, username, photo_url, userId } = req.body;
 
     if (!id || !first_name) {
         return res.status(400).json({ error: 'Telegram ID and first_name are required' });
@@ -214,49 +214,74 @@ router.post('/telegram-login', async (req, res) => {
 
     try {
         const fullName = last_name ? `${first_name} ${last_name}` : first_name;
+        let user;
 
-        // Check if user exists by telegram_id
-        let { data: user, error: findError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('telegram_id', id)
-            .maybeSingle();
-
-        if (findError) throw findError;
-
-        if (user) {
-            // Update existing user's Telegram info
-            const { data: updatedUser, error: updateError } = await supabase
+        if (userId) {
+            // Priority 1: Link to the explicit user ID provided by the frontend
+            const { data: linkedUser, error: linkError } = await supabase
                 .from('users')
                 .update({
                     telegram_id: id,
-                    photo_url: photo_url || user.photo_url,
-                    username: username || user.username,
-                    name: user.name || fullName // Only update name if it was empty
+                    photo_url: photo_url || null,
+                    username: username || null,
+                    name: fullName // Always update/sync name from TG if possible
                 })
-                .eq('id', user.id)
+                .eq('id', userId)
                 .select()
-                .single();
+                .maybeSingle();
 
-            if (updateError) throw updateError;
-            user = { ...updatedUser, isNew: !updatedUser.phone }; // It's "new" if they lack a phone number, which is needed for core app functions
-        } else {
-            // Create new user
-            const { data: newUser, error: insertError } = await supabase
-                .from('users')
-                .insert([{
-                    telegram_id: id,
-                    name: fullName,
-                    username: username,
-                    photo_url: photo_url,
-                    role: 'passenger'
-                }])
-                .select()
-                .single();
-
-            if (insertError) throw insertError;
-            user = { ...newUser, isNew: true };
+            if (!linkError && linkedUser) {
+                user = linkedUser;
+            }
         }
+
+        if (!user) {
+            // Priority 2: Check if user exists by telegram_id
+            let { data: existingUser, error: findError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('telegram_id', id)
+                .maybeSingle();
+
+            if (findError) throw findError;
+
+            if (existingUser) {
+                // Update existing user's Telegram info
+                const { data: updatedUser, error: updateError } = await supabase
+                    .from('users')
+                    .update({
+                        telegram_id: id,
+                        photo_url: photo_url || existingUser.photo_url,
+                        username: username || existingUser.username,
+                        name: existingUser.name || fullName
+                    })
+                    .eq('id', existingUser.id)
+                    .select()
+                    .single();
+
+                if (updateError) throw updateError;
+                user = updatedUser;
+            } else {
+                // Priority 3: Create new user
+                const { data: newUser, error: insertError } = await supabase
+                    .from('users')
+                    .insert([{
+                        telegram_id: id,
+                        name: fullName,
+                        username: username,
+                        photo_url: photo_url,
+                        role: 'passenger'
+                    }])
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+                user = newUser;
+            }
+        }
+
+        // Set isNew flag if they haven't provided a phone number yet
+        user.isNew = !user.phone;
 
         res.json({ user, token: 'tg-token-' + user.id });
     } catch (err) {
