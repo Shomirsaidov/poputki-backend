@@ -262,9 +262,9 @@ router.post('/telegram-login', async (req, res) => {
                 .from('users')
                 .update({
                     telegram_id: id,
+                    tg_username: username || null, // Specific column for handle
                     photo_url: photo_url || null,
-                    username: username || null,
-                    name: fullName // Always update/sync name from TG if possible
+                    name: fullName // Keep real name from TG
                 })
                 .eq('id', userId)
                 .select()
@@ -291,8 +291,8 @@ router.post('/telegram-login', async (req, res) => {
                     .from('users')
                     .update({
                         telegram_id: id,
+                        tg_username: username || existingUser.tg_username,
                         photo_url: photo_url || existingUser.photo_url,
-                        username: username || existingUser.username,
                         name: existingUser.name || fullName
                     })
                     .eq('id', existingUser.id)
@@ -307,8 +307,8 @@ router.post('/telegram-login', async (req, res) => {
                     .from('users')
                     .insert([{
                         telegram_id: id,
+                        tg_username: username,
                         name: fullName,
-                        username: username,
                         photo_url: photo_url,
                         role: 'passenger'
                     }])
