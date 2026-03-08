@@ -52,9 +52,11 @@ async function sendBroadcast(text, rideId = null) {
 
     const inlineKeyboard = [];
 
+    const appUrl = process.env.MINI_APP_URL || 'https://poputki.online';
+
     if (rideId) {
         inlineKeyboard.push([
-            { text: 'Подробнее', url: `https://t.me/poputkionline_bot/app?startapp=rides_${rideId}` }
+            { text: 'Подробнее', url: `${appUrl}/ride/${rideId}` }
         ]);
     }
 
