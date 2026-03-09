@@ -482,4 +482,75 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/rides/{id}/share:
+ *   post:
+ *     summary: Share a driver's ride with a passenger
+ *     tags: [Rides]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               driver_ride_id:
+ *                 type: integer
+ */
+router.post('/:id/share', async (req, res) => {
+    const passengerReqId = req.params.id;
+    const { driver_ride_id } = req.body;
+    try {
+        const { data: passengerReq, error: pError } = await supabase
+            .from('rides')
+            .select('*')
+            .eq('id', passengerReqId)
+            .single();
+
+        if (pError || !passengerReq) {
+            console.error('Share error (passengerReq):', pError);
+            return res.status(404).json({ error: 'Заявка пассажира не найдена' });
+        }
+
+        if (!passengerReq.is_passenger_entry) {
+            return res.status(400).json({ error: 'Эта поездка не является заявкой пассажира' });
+        }
+
+        const { data: driverRide, error: dError } = await supabase
+            .from('rides')
+            .select(`*, users:driver_id(name, phone)`)
+            .eq('id', driver_ride_id)
+            .single();
+
+        if (dError || !driverRide) {
+            console.error('Share error (driverRide):', dError);
+            return res.status(404).json({ error: 'Поездка водителя не найдена' });
+        }
+
+        const dateStr = driverRide.date;
+        const timeStr = driverRide.time ? driverRide.time.substring(0, 5) : '';
+        const driverName = driverRide.users ? driverRide.users.name : 'Водитель';
+        const driverPhone = driverRide.users ? driverRide.users.phone : '';
+
+        // Add to telegram queue or send right away
+        const msg = `🚗 <b>ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ ПОЕЗДКИ</b>\n\nВодитель <b>${driverName}</b> предлагает вам присоединиться к его поездке:\n📍 <b>Маршрут:</b> ${driverRide.from_city} ➡ ${driverRide.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💵 <b>Цена от:</b> ${driverRide.price} с.\n\n📞 <b>Связаться с водителем:</b> +${driverPhone}\n\n<i>Откройте список поездок, найдите водителя и забронируйте место!</i>`;
+
+        const personalMsgSuccess = await sendPersonalMessage(passengerReq.driver_id, msg);
+
+        if (!personalMsgSuccess) {
+            return res.status(500).json({ error: 'Не удалось отправить уведомление пассажиру. Возможно, он не запустил бота.' });
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
