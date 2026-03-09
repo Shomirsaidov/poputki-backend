@@ -308,14 +308,14 @@ router.post('/', async (req, res) => {
             const broadcastMsg = `🙋 ПАССАЖИР ИЩЕТ ПОЕЗДКУ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `Вы успешно создали заявку на поиск машины по маршруту <b>${from_city} - ${to_city}</b> на ${dateStr} в ${timeStr}.`;
+            const personalMsg = `📝 <b>ЗАЯВКА ОПУБЛИКОВАНА</b>\n\nВы успешно начали поиск машины:\n🚗 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n<i>Ваша заявка видна водителям. Как только кто-то предложит место, вы получите уведомление!</i>`;
             sendPersonalMessage(driver_id, personalMsg);
         } else {
             const deliveryText = allows_delivery ? '\n📦 Беру посылки' : '';
             const broadcastMsg = `🚗 ВОДИТЕЛЬ ИЩЕТ ПАССАЖИРОВ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n💰 Цена: ${price} сом\n💺 Свободных мест: ${seats}${deliveryText}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `Вы успешно создали поездку по маршруту <b>${from_city} - ${to_city}</b> на ${dateStr} в ${timeStr}.`;
+            const personalMsg = `🚀 <b>ПОЕЗДКА СОЗДАНА</b>\n\nВы успешно опубликовали поездку:\n📍 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💰 <b>Цена за место:</b> от ${price} сом\n💺 <b>Количество мест:</b> ${seats}\n\n<i>Ваше объявление добавлено в ленту. Вы получите уведомление при новом бронировании.</i>`;
             sendPersonalMessage(driver_id, personalMsg);
         }
 
@@ -440,7 +440,7 @@ router.post('/:id/cancel', async (req, res) => {
         const timeStr = ride.time ? ride.time.substring(0, 5) : '';
 
         if (!ride.is_passenger_entry && bookings && bookings.length > 0) {
-            const cancelMsg = `⚠️ Поездка <b>${ride.from_city} - ${ride.to_city}</b> на ${dateStr} в ${timeStr} была отменена водителем.`;
+            const cancelMsg = `🚫 <b>ПОЕЗДКА ОТМЕНЕНА</b>\n\nК сожалению, водитель отменил запланированную поездку:\n📍 <b>Маршрут:</b> ${ride.from_city} ➡ ${ride.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n<i>Ваша бронь аннулирована. Пожалуйста, найдите другую поездку в приложении. Приносим извинения за неудобства.</i>`;
             bookings.forEach(b => {
                 sendPersonalMessage(b.passenger_id, cancelMsg);
             });

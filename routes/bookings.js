@@ -62,15 +62,23 @@ router.post('/', async (req, res) => {
                 .eq('id', ride_id)
                 .single();
 
-            if (rideData) {
+            const { data: userData } = await supabase
+                .from('users')
+                .select('name, phone')
+                .eq('id', passenger_id)
+                .single();
+
+            if (rideData && userData) {
                 const dateStr = rideData.date;
                 const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
 
                 // Notify passenger
-                sendPersonalMessage(passenger_id, `✅ Вы успешно забронировали место на поездку <b>${rideData.from_city} - ${rideData.to_city}</b> на ${dateStr} в ${timeStr}.`);
+                const passMsg = `✅ <b>Бронирование подтверждено!</b>\n\n🚗 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr}\n⏰ <b>Время:</b> ${timeStr}\n💺 <b>Место:</b> ${seat_number}\n\n<i>Водитель уведомлен. Приятной поездки!</i>`;
+                sendPersonalMessage(passenger_id, passMsg);
 
                 // Notify driver
-                sendPersonalMessage(rideData.driver_id, `🔔 Новая бронь!\nМесто: ${seat_number}\nПоездка: <b>${rideData.from_city} - ${rideData.to_city}</b> на ${dateStr} в ${timeStr}.`);
+                const driverMsg = `🔔 <b>Новая заявка на поездку!</b>\n\n🧑‍💻 <b>Пассажир:</b> ${userData.name}\n📞 <b>Телефон:</b> ${userData.phone || 'Не указан'}\n💺 <b>Выбранное место:</b> ${seat_number}\n\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}`;
+                sendPersonalMessage(rideData.driver_id, driverMsg);
             }
         } catch (e) {
             console.error('Telegram Bookings Error:', e);
@@ -149,7 +157,7 @@ router.post('/:id/cancel', async (req, res) => {
         // Telegram Notifications
         const dateStr = rideData.date;
         const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
-        sendPersonalMessage(rideData.driver_id, `⚠️ Пассажир отменил бронь (Место ${booking.seat_number}) на поездку <b>${rideData.from_city} - ${rideData.to_city}</b> на ${dateStr} в ${timeStr}.`);
+        sendPersonalMessage(rideData.driver_id, `⚠️ <b>Отмена бронирования</b>\n\nПассажир отменил свою бронь.\n💺 <b>Место:</b> ${booking.seat_number}\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}\n\n<i>Место снова доступно для других попутчиков.</i>`);
 
     } catch (err) {
         res.status(500).json({ error: err.message });

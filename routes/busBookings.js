@@ -94,7 +94,23 @@ router.post('/', async (req, res) => {
         // Telegram Notifications
         const dateStr = ticket.departure_date;
         const timeStr = ticket.departure_time ? ticket.departure_time.substring(0, 5) : '';
-        sendPersonalMessage(passenger_id, `✅ Вы успешно забронировали билеты на автобус <b>${ticket.from_city} - ${ticket.to_city}</b> на ${dateStr} в ${timeStr}.\nМеста: ${seat_numbers.join(', ')}\nК оплате: ${totalPrice} сом.`);
+
+        let passengersList = '';
+        passengers_data.forEach((p, idx) => {
+            passengersList += `\n${idx + 1}. ${p.firstName} ${p.lastName} (${p.documentType} ${p.documentNumber})`;
+        });
+
+        const ticketMsg = `🎫 <b>ЭЛЕКТРОННЫЙ БИЛЕТ НА АВТОБУС</b> 🎫\n\n` +
+            `✅ <b>Статус:</b> Забронировано\n` +
+            `🚌 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+            `🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n` +
+            `📞 <b>Покупатель:</b> ${phone}\n` +
+            `💺 <b>Количество мест:</b> ${seat_numbers.length} (Места: ${seat_numbers.join(', ')})\n` +
+            `👥 <b>Пассажиры:</b>${passengersList}\n\n` +
+            `💰 <b>Общая стоимость:</b> ${totalPrice} сом\n\n` +
+            `<i>Пожалуйста, сохраните этот билет. Счастливого пути!</i>`;
+
+        sendPersonalMessage(passenger_id, ticketMsg);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
