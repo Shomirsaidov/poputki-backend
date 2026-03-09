@@ -312,10 +312,10 @@ router.post('/', async (req, res) => {
             sendPersonalMessage(driver_id, personalMsg);
         } else {
             const deliveryText = allows_delivery ? '\n📦 Беру посылки' : '';
-            const broadcastMsg = `🚗 ВОДИТЕЛЬ ИЩЕТ ПАССАЖИРОВ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n💰 Цена: ${price} сом\n💺 Свободных мест: ${seats}${deliveryText}`;
+            const broadcastMsg = `🚗 ВОДИТЕЛЬ ИЩЕТ ПАССАЖИРОВ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n 💺 Свободных мест: ${seats}${deliveryText}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `🚀 <b>ПОЕЗДКА СОЗДАНА</b>\n\nВы успешно опубликовали поездку:\n📍 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💰 <b>Цена за место:</b> от ${price} сом\n💺 <b>Количество мест:</b> ${seats}\n\n<i>Ваше объявление добавлено в ленту. Вы получите уведомление при новом бронировании.</i>`;
+            const personalMsg = `🚀 <b>ПОЕЗДКА СОЗДАНА</b>\n\nВы успешно опубликовали поездку:\n📍 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💺 <b>Количество мест:</b> ${seats}\n\n<i>Ваше объявление добавлено в ленту. Вы получите уведомление при новом бронировании.</i>`;
             sendPersonalMessage(driver_id, personalMsg);
         }
 
