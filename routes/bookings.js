@@ -28,6 +28,17 @@ const { sendPersonalMessage } = require('../utils/telegramBot');
 router.post('/', async (req, res) => {
     const { ride_id, passenger_id, seat_number, passenger_gender } = req.body;
 
+    // Verify user exists to avoid foreign key violation (common after DB reset)
+    const { data: userExists, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', passenger_id)
+        .maybeSingle();
+
+    if (userError || !userExists) {
+        return res.status(401).json({ error: 'Ваша сессия устарела. Пожалуйста, выйдите из профиля и войдите снова.' });
+    }
+
     if (!seat_number) {
         return res.status(400).json({ error: 'Seat number is required' });
     }
