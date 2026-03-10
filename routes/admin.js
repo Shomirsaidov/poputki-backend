@@ -248,6 +248,7 @@ router.get('/cities', async (req, res) => {
             .select('*')
             .order('name', { ascending: true });
         if (error) throw error;
+        console.log(`[Admin] Fetched ${cities?.length} cities`);
         res.json(cities);
     } catch (err) {
         res.status(500).json({ error: err.message });
