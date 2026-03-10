@@ -235,6 +235,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
     const { driver_id, from_city, to_city, date, time, price, seats, description, is_passenger_entry, reserved_seats, allows_delivery, from_address, to_address, total_seats, row_prices } = req.body;
+    console.log(`[Ride Creation] Attempting to create ride for driver_id: ${driver_id}`);
     try {
         const { data: activeRides } = await supabase
             .from('rides')
