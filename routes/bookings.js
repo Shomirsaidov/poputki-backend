@@ -156,25 +156,39 @@ router.post('/:id/cancel', async (req, res) => {
             return res.status(400).json({ error: 'Нельзя отменить бронь после начала поездки' });
         }
 
-        const { error: deleteError } = await supabase
-            .from('bookings')
-            .delete()
-            .eq('id', id);
-
         if (deleteError) throw deleteError;
+
+        // Fetch passenger details for notification
+        const { data: passengerData } = await supabase
+            .from('users')
+            .select('name, phone')
+            .eq('id', booking.passenger_id)
+            .single();
 
         res.json({ success: true });
 
         // Telegram Notifications
         const dateStr = rideData.date;
         const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
+        const passengerName = passengerData ? passengerData.name : 'Пассажир';
+        const passengerPhone = passengerData ? (passengerData.phone ? `+${passengerData.phone}` : 'Не указан') : 'Не указан';
+
         const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${booking.ride_id}`;
         const options = {
             reply_markup: {
                 inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
             }
         };
-        sendPersonalMessage(rideData.driver_id, `⚠️ <b>Отмена бронирования</b>\n\nПассажир отменил свою бронь.\n💺 <b>Место:</b> ${booking.seat_number}\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}\n\n<i>Место снова доступно для других попутчиков.</i>`, options);
+
+        const cancelMsg = `⚠️ <b>ОТМЕНА БРОНИРОВАНИЯ</b>\n\n` +
+            `👤 <b>Пассажир:</b> ${passengerName}\n` +
+            `📞 <b>Телефон:</b> ${passengerPhone}\n` +
+            `💺 <b>Место:</b> ${booking.seat_number}\n\n` +
+            `📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n` +
+            `🗓 <b>Дата:</b> ${dateStr} в ${timeStr}\n\n` +
+            `<i>Место снова доступно для других попутчиков.</i>`;
+
+        sendPersonalMessage(rideData.driver_id, cancelMsg, options);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
