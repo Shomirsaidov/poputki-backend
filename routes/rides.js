@@ -308,15 +308,25 @@ router.post('/', async (req, res) => {
             const broadcastMsg = `🙋 ПАССАЖИР ИЩЕТ ПОЕЗДКУ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `📝 <b>ЗАЯВКА ОПУБЛИКОВАНА</b>\n\nВы успешно начали поиск машины:\n🚗 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n<i>Ваша заявка видна водителям. Как только кто-то предложит место, вы получите уведомление!</i>`;
-            sendPersonalMessage(driver_id, personalMsg);
+            const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
+            const options = {
+                reply_markup: {
+                    inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                }
+            };
+            sendPersonalMessage(driver_id, personalMsg, options);
         } else {
             const deliveryText = allows_delivery ? '\n📦 Беру посылки' : '';
             const broadcastMsg = `🚗 ВОДИТЕЛЬ ИЩЕТ ПАССАЖИРОВ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n 💺 Свободных мест: ${seats}${deliveryText}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `🚀 <b>ПОЕЗДКА СОЗДАНА</b>\n\nВы успешно опубликовали поездку:\n📍 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💺 <b>Количество мест:</b> ${seats}\n\n<i>Ваше объявление добавлено в ленту. Вы получите уведомление при новом бронировании.</i>`;
-            sendPersonalMessage(driver_id, personalMsg);
+            const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
+            const options = {
+                reply_markup: {
+                    inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                }
+            };
+            sendPersonalMessage(driver_id, personalMsg, options);
         }
 
     } catch (err) {

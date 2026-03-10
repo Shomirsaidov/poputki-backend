@@ -84,8 +84,9 @@ async function sendBroadcast(text, rideId = null) {
  * Fetches the user's `telegram_id` from Supabase before sending.
  * @param {string|number} userId - The user's internal ID in the Supabase `users` table.
  * @param {string} text - HTML formatted message text.
+ * @param {object} [options] - Optional configurations (e.g., inline keyboards).
  */
-async function sendPersonalMessage(userId, text) {
+async function sendPersonalMessage(userId, text, options = {}) {
     if (!userId) return false;
 
     try {
@@ -105,7 +106,7 @@ async function sendPersonalMessage(userId, text) {
             return false;
         }
 
-        return await sendMessage(user.telegram_id, text);
+        return await sendMessage(user.telegram_id, text, options);
     } catch (error) {
         console.error('Telegram Bot Personal Message Error:', error.message);
         return false;

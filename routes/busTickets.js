@@ -85,8 +85,11 @@ router.post('/', async (req, res) => {
         // Telegram Notifications
         const dateStr = departure_date;
         const timeStr = departure_time ? departure_time.substring(0, 5) : '';
-        const broadcastMsg = `🚌 НОВЫЙ АВТОБУСНЫЙ РЕЙС\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n💰 Цена: ${price} сом\n🏢 Перевозчик: ${transport_company}`;
-        sendBroadcast(broadcastMsg);
+        const stopsText = intermediate_stops && intermediate_stops.length > 0
+            ? `\n🛑 Остановки: ${intermediate_stops.map(s => s.city).join(', ')}`
+            : '';
+        const broadcastMsg = `🚌 НОВЫЙ АВТОБУСНЫЙ РЕЙС\n📍 Маршрут: ${from_city} ➡ ${to_city}${stopsText}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n💰 Цена: ${price} сом\n🏢 Перевозчик: ${transport_company}`;
+        sendBroadcast(broadcastMsg, ticket.id);
 
     } catch (err) {
         res.status(500).json({ error: err.message });

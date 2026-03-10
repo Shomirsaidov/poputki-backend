@@ -74,11 +74,22 @@ router.post('/', async (req, res) => {
 
                 // Notify passenger
                 const passMsg = `✅ <b>Бронирование подтверждено!</b>\n\n🚗 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr}\n⏰ <b>Время:</b> ${timeStr}\n💺 <b>Место:</b> ${seat_number}\n\n<i>Водитель уведомлен. Приятной поездки!</i>`;
-                sendPersonalMessage(passenger_id, passMsg);
+                const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride_id}`;
+                const options = {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                    }
+                };
+                sendPersonalMessage(passenger_id, passMsg, options);
 
                 // Notify driver
                 const driverMsg = `🔔 <b>Новая заявка на поездку!</b>\n\n🧑‍💻 <b>Пассажир:</b> ${userData.name}\n📞 <b>Телефон:</b> ${userData.phone || 'Не указан'}\n💺 <b>Выбранное место:</b> ${seat_number}\n\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}`;
-                sendPersonalMessage(rideData.driver_id, driverMsg);
+                const optionsDriver = {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                    }
+                };
+                sendPersonalMessage(rideData.driver_id, driverMsg, optionsDriver);
             }
         } catch (e) {
             console.error('Telegram Bookings Error:', e);
@@ -157,7 +168,13 @@ router.post('/:id/cancel', async (req, res) => {
         // Telegram Notifications
         const dateStr = rideData.date;
         const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
-        sendPersonalMessage(rideData.driver_id, `⚠️ <b>Отмена бронирования</b>\n\nПассажир отменил свою бронь.\n💺 <b>Место:</b> ${booking.seat_number}\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}\n\n<i>Место снова доступно для других попутчиков.</i>`);
+        const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${booking.ride_id}`;
+        const options = {
+            reply_markup: {
+                inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+            }
+        };
+        sendPersonalMessage(rideData.driver_id, `⚠️ <b>Отмена бронирования</b>\n\nПассажир отменил свою бронь.\n💺 <b>Место:</b> ${booking.seat_number}\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}\n\n<i>Место снова доступно для других попутчиков.</i>`, options);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
