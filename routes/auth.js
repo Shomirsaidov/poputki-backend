@@ -4,7 +4,8 @@ const supabase = require('../db');
 const crypto = require('crypto');
 
 // Professional Telegram initData verification
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8669833278:AAFHxzU9jZUZIWVrHdogUsYrkQmd_F05MZA';
+// Hardcoded Bot Token to ensure consistency across services
+const BOT_TOKEN = '8669833278:AAFHxzU9jZUZIWVrHdogUsYrkQmd_F05MZA';
 
 function verifyTelegramData(initData) {
     if (!initData) return false;
@@ -101,7 +102,7 @@ router.post('/login', async (req, res) => {
             if (insertError) throw insertError;
             user = { ...newUser, isNew: true };
         } else {
-            user.isNew = !user.name; // user is new if they haven't completed profile
+            user.isNew = !user.phone || !user.age || !user.name; // user is new if they haven't completed profile
         }
         res.json({ user, token: 'mock-token-' + user.id });
     } catch (err) {
@@ -256,53 +257,87 @@ router.post('/telegram-login', async (req, res) => {
         const fullName = last_name ? `${first_name} ${last_name}` : first_name;
         let user;
 
+        // Step 1: Check if this telegram_id already exists in our DB
+        const { data: existingTgUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('telegram_id', id)
+            .maybeSingle();
+
         if (userId) {
-            // Priority 1: Link to the explicit user ID provided by the frontend
-            const { data: linkedUser, error: linkError } = await supabase
-                .from('users')
-                .update({
-                    telegram_id: id,
-                    tg_username: username || null, // Specific column for handle
-                    photo_url: photo_url || null,
-                    name: fullName // Keep real name from TG
-                })
-                .eq('id', userId)
-                .select()
-                .maybeSingle();
-
-            if (!linkError && linkedUser) {
-                user = linkedUser;
-            }
-        }
-
-        if (!user) {
-            // Priority 2: Check if user exists by telegram_id
-            let { data: existingUser, error: findError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('telegram_id', id)
-                .maybeSingle();
-
-            if (findError) throw findError;
-
-            if (existingUser) {
-                // Update existing user's Telegram info
-                const { data: updatedUser, error: updateError } = await supabase
+            // We want to link the TG account to an existing profile (usually logged in via phone)
+            if (existingTgUser) {
+                if (existingTgUser.id !== parseInt(userId)) {
+                    // Conflict: This TG account is already linked to another DB user
+                    // If the existing linked user is just a skeleton (no phone), we can merge/transfer
+                    if (!existingTgUser.phone) {
+                        // Delete the skeleton TG user
+                        await supabase.from('users').delete().eq('id', existingTgUser.id);
+                        // Now update the current user (phone user) with the TG info
+                        const { data: updatedUser } = await supabase
+                            .from('users')
+                            .update({
+                                telegram_id: id,
+                                tg_username: username || null,
+                                photo_url: photo_url || null,
+                                name: fullName
+                            })
+                            .eq('id', userId)
+                            .select()
+                            .single();
+                        user = updatedUser;
+                    } else {
+                        // Existing user has a phone! This is a real conflict. 
+                        // Just use the existing user instead of linking to the new one?
+                        // For now, prioritize the account that already has the phone.
+                        user = existingTgUser;
+                    }
+                } else {
+                    // Already linked correctly, just update info
+                    const { data: updatedUser } = await supabase
+                        .from('users')
+                        .update({
+                            tg_username: username || existingTgUser.tg_username,
+                            photo_url: photo_url || existingTgUser.photo_url,
+                            name: existingTgUser.name || fullName
+                        })
+                        .eq('id', userId)
+                        .select()
+                        .single();
+                    user = updatedUser;
+                }
+            } else {
+                // Link new TG account to existing phone user
+                const { data: updatedUser } = await supabase
                     .from('users')
                     .update({
                         telegram_id: id,
-                        tg_username: username || existingUser.tg_username,
-                        photo_url: photo_url || existingUser.photo_url,
-                        name: existingUser.name || fullName
+                        tg_username: username || null,
+                        photo_url: photo_url || null,
+                        name: fullName
                     })
-                    .eq('id', existingUser.id)
+                    .eq('id', userId)
                     .select()
                     .single();
-
-                if (updateError) throw updateError;
+                user = updatedUser;
+            }
+        } else {
+            // No userId provided, just find or create by telegram_id
+            if (existingTgUser) {
+                // Update existing user's Telegram info
+                const { data: updatedUser } = await supabase
+                    .from('users')
+                    .update({
+                        tg_username: username || existingTgUser.tg_username,
+                        photo_url: photo_url || existingTgUser.photo_url,
+                        name: existingTgUser.name || fullName
+                    })
+                    .eq('id', existingTgUser.id)
+                    .select()
+                    .single();
                 user = updatedUser;
             } else {
-                // Priority 3: Create new user
+                // Create new user from TG info
                 const { data: newUser, error: insertError } = await supabase
                     .from('users')
                     .insert([{
@@ -320,8 +355,8 @@ router.post('/telegram-login', async (req, res) => {
             }
         }
 
-        // Set isNew flag if they haven't provided a phone number yet
-        user.isNew = !user.phone;
+        // Set isNew flag if they haven't provided enough info yet
+        user.isNew = !user.phone || !user.age || !user.name;
 
         res.json({ user, token: 'tg-token-' + user.id });
     } catch (err) {
