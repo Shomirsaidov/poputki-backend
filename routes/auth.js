@@ -253,6 +253,8 @@ router.post('/telegram-login', async (req, res) => {
         return res.status(403).json({ error: 'Invalid Telegram data' });
     }
 
+    console.log(`Telegram Login request for ID: ${id}, Name: ${first_name}, userId: ${userId}`);
+
     try {
         const fullName = last_name ? `${first_name} ${last_name}` : first_name;
         let user;
@@ -274,17 +276,22 @@ router.post('/telegram-login', async (req, res) => {
                         // Delete the skeleton TG user
                         await supabase.from('users').delete().eq('id', existingTgUser.id);
                         // Now update the current user (phone user) with the TG info
-                        const { data: updatedUser } = await supabase
+                        const { data: updatedUser, error: updateError } = await supabase
                             .from('users')
                             .update({
                                 telegram_id: id,
-                                tg_username: username || null,
+                                username: username || null,
                                 photo_url: photo_url || null,
                                 name: fullName
                             })
                             .eq('id', userId)
                             .select()
                             .single();
+
+                        if (updateError) {
+                            console.error("Error updating user with TG info (merge):", updateError);
+                            throw updateError;
+                        }
                         user = updatedUser;
                     } else {
                         // Existing user has a phone! This is a real conflict. 
@@ -294,47 +301,62 @@ router.post('/telegram-login', async (req, res) => {
                     }
                 } else {
                     // Already linked correctly, just update info
-                    const { data: updatedUser } = await supabase
+                    const { data: updatedUser, error: updateError } = await supabase
                         .from('users')
                         .update({
-                            tg_username: username || existingTgUser.tg_username,
+                            username: username || existingTgUser.username,
                             photo_url: photo_url || existingTgUser.photo_url,
                             name: existingTgUser.name || fullName
                         })
                         .eq('id', userId)
                         .select()
                         .single();
+
+                    if (updateError) {
+                        console.error("Error updating existing linked user:", updateError);
+                        throw updateError;
+                    }
                     user = updatedUser;
                 }
             } else {
                 // Link new TG account to existing phone user
-                const { data: updatedUser } = await supabase
+                const { data: updatedUser, error: updateError } = await supabase
                     .from('users')
                     .update({
                         telegram_id: id,
-                        tg_username: username || null,
+                        username: username || null,
                         photo_url: photo_url || null,
                         name: fullName
                     })
                     .eq('id', userId)
                     .select()
                     .single();
+
+                if (updateError) {
+                    console.error("Error linking TG to user:", updateError);
+                    throw updateError;
+                }
                 user = updatedUser;
             }
         } else {
             // No userId provided, just find or create by telegram_id
             if (existingTgUser) {
                 // Update existing user's Telegram info
-                const { data: updatedUser } = await supabase
+                const { data: updatedUser, error: updateError } = await supabase
                     .from('users')
                     .update({
-                        tg_username: username || existingTgUser.tg_username,
+                        username: username || existingTgUser.username,
                         photo_url: photo_url || existingTgUser.photo_url,
                         name: existingTgUser.name || fullName
                     })
                     .eq('id', existingTgUser.id)
                     .select()
                     .single();
+
+                if (updateError) {
+                    console.error("Error updating existing TG user:", updateError);
+                    throw updateError;
+                }
                 user = updatedUser;
             } else {
                 // Create new user from TG info
@@ -342,7 +364,7 @@ router.post('/telegram-login', async (req, res) => {
                     .from('users')
                     .insert([{
                         telegram_id: id,
-                        tg_username: username,
+                        username: username,
                         name: fullName,
                         photo_url: photo_url,
                         role: 'passenger'
@@ -350,7 +372,10 @@ router.post('/telegram-login', async (req, res) => {
                     .select()
                     .single();
 
-                if (insertError) throw insertError;
+                if (insertError) {
+                    console.error("Error creating new TG user:", insertError);
+                    throw insertError;
+                }
                 user = newUser;
             }
         }
