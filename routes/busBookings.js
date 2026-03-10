@@ -123,6 +123,19 @@ router.post('/', async (req, res) => {
 
         sendPersonalMessage(passenger_id, ticketMsg);
 
+        // Driver Notification
+        if (ticket.operator_id) {
+            const driverMsg = `🔔 <b>НОВОЕ БРОНИРОВАНИЕ</b> 🚌\n\n` +
+                `📍 <b>Маршрут:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+                `🗓 <b>Дата/время:</b> ${dateStr} в ${timeStr}\n\n` +
+                `👤 <b>Пассажир (телефон):</b> ${phone}\n` +
+                `💺 <b>Места:</b> ${seat_numbers.join(', ')} (${seat_numbers.length} чел.)\n` +
+                `👥 <b>Список:</b>${passengersList}\n\n` +
+                `💰 <b>Сумма:</b> ${totalPrice} сом`;
+
+            sendPersonalMessage(ticket.operator_id, driverMsg);
+        }
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
