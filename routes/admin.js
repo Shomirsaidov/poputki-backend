@@ -242,11 +242,18 @@ router.put('/rides/:id', async (req, res) => {
 
 // City Management
 router.get('/cities', async (req, res) => {
+    const { type } = req.query;
     try {
-        const { data: cities, error } = await supabase
+        let query = supabase
             .from('cities')
             .select('*')
             .order('name', { ascending: true });
+        
+        if (type) {
+            query = query.eq('type', type);
+        }
+
+        const { data: cities, error } = await query;
         if (error) throw error;
         console.log(`[Admin] Fetched ${cities?.length} cities`);
         res.json(cities);
@@ -256,9 +263,9 @@ router.get('/cities', async (req, res) => {
 });
 
 router.post('/cities', async (req, res) => {
-    const { name } = req.body;
+    const { name, type } = req.body;
     try {
-        const { error } = await supabase.from('cities').insert([{ name }]);
+        const { error } = await supabase.from('cities').insert([{ name, type: type || 'ride' }]);
         if (error) throw error;
         res.json({ success: true });
     } catch (err) {

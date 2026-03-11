@@ -10,11 +10,18 @@ const supabase = require('../db');
  *     tags: [General]
  */
 router.get('/cities', async (req, res) => {
+    const { type } = req.query;
     try {
-        const { data: cities, error } = await supabase
+        let query = supabase
             .from('cities')
             .select('name')
             .order('name', { ascending: true });
+        
+        if (type) {
+            query = query.eq('type', type);
+        }
+
+        const { data: cities, error } = await query;
 
         if (error) throw error;
 
