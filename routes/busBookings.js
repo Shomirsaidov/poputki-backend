@@ -75,7 +75,13 @@ router.post('/', async (req, res) => {
         const conflict = seat_numbers.some(s => takenSeats.includes(s));
         if (conflict) return res.status(400).json({ error: 'Одно или несколько мест уже заняты' });
 
-        const totalPrice = ticket.price * seat_numbers.length;
+        // Calculate price with premium seat support
+        const premiumSeatNums = ticket.bus_type === 'double' ? [69, 70, 71, 72, 73, 74, 75, 76, 53, 54, 55, 56] : [];
+        const premiumPrice = ticket.premium_price || ticket.price;
+        let totalPrice = 0;
+        for (const seatNum of seat_numbers) {
+            totalPrice += premiumSeatNums.includes(seatNum) ? premiumPrice : ticket.price;
+        }
 
         const { data: booking, error: insertError } = await supabase
             .from('bus_ticket_bookings')

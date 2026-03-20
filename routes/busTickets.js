@@ -61,7 +61,8 @@ router.post('/', async (req, res) => {
         from_city, from_address, to_city, to_address,
         departure_date, departure_time, arrival_date, arrival_time,
         duration_minutes, price, total_seats,
-        bus_type, passenger_comments, intermediate_stops
+        bus_type, passenger_comments, intermediate_stops,
+        floor1_seats, floor2_seats, premium_price
     } = req.body;
     try {
         const { data: ticket, error } = await supabase
@@ -70,10 +71,13 @@ router.post('/', async (req, res) => {
                 operator_id, transport_company,
                 from_city, from_address, to_city, to_address,
                 departure_date, departure_time, arrival_date, arrival_time,
-                duration_minutes, price, total_seats: total_seats || 44,
+                duration_minutes, price, total_seats: total_seats || 53,
                 reserved_seats: [], status: 'active',
                 bus_type: bus_type || 'single', passenger_comments,
-                intermediate_stops: intermediate_stops || []
+                intermediate_stops: intermediate_stops || [],
+                floor1_seats: floor1_seats || null,
+                floor2_seats: floor2_seats || null,
+                premium_price: premium_price || null
             }])
             .select('id')
             .single();
@@ -198,7 +202,13 @@ router.get('/:id', async (req, res) => {
             });
         });
 
-        res.json({ ...ticket, bookings, bookedSeats, seatGenders });
+        // Calculate premium seats for double-decker
+        let premiumSeats = [];
+        if (ticket.bus_type === 'double') {
+            premiumSeats = [69, 70, 71, 72, 73, 74, 75, 76, 53, 54, 55, 56];
+        }
+
+        res.json({ ...ticket, bookings, bookedSeats, seatGenders, premiumSeats });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
