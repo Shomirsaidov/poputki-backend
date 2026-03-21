@@ -84,14 +84,14 @@ async function sendBroadcast(text, rideId = null) {
         inlineKeyboard.push([
             { 
                 text: '🚀 Подробнее в приложении', 
-                url: `https://t.me/${botUsername}/app?startapp=ride_${rideId}` 
+                url: `https://t.me/${botUsername}?startapp=ride_${rideId}` 
             }
         ]);
     } else {
         inlineKeyboard.push([
             { 
                 text: '📱 Открыть приложение', 
-                url: `https://t.me/${botUsername}/app` 
+                url: `https://t.me/${botUsername}?startapp` 
             }
         ]);
     }
