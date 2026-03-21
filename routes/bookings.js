@@ -26,9 +26,9 @@ const { sendPersonalMessage } = require('../utils/telegramBot');
  *                 type: string
  */
 router.post('/', async (req, res) => {
-    const { ride_id, passenger_id, seat_number, passenger_gender } = req.body;
+    const { ride_id, passenger_id, seat_number, passenger_gender, seats } = req.body;
 
-    // Verify user exists to avoid foreign key violation (common after DB reset)
+    // Verify user exists to avoid foreign key violation
     const { data: userExists, error: userError } = await supabase
         .from('users')
         .select('id')
@@ -39,31 +39,49 @@ router.post('/', async (req, res) => {
         return res.status(401).json({ error: 'Ваша сессия устарела. Пожалуйста, выйдите из профиля и войдите снова.' });
     }
 
-    if (!seat_number) {
-        return res.status(400).json({ error: 'Seat number is required' });
+    // Prepare bookings array: either from 'seats' array or single 'seat_number'
+    let bookingsToInsert = [];
+    if (seats && Array.isArray(seats) && seats.length > 0) {
+        bookingsToInsert = seats.map(s => ({
+            ride_id,
+            passenger_id,
+            seat_number: s.seat_number,
+            passenger_gender: s.passenger_gender
+        }));
+    } else if (seat_number) {
+        bookingsToInsert = [{
+            ride_id,
+            passenger_id,
+            seat_number,
+            passenger_gender
+        }];
+    } else {
+        return res.status(400).json({ error: 'Seat selection is required' });
     }
 
     try {
-        const { data: existingBooking } = await supabase
+        // 1. Verify all seats are available
+        const seatNumbers = bookingsToInsert.map(b => b.seat_number);
+        const { data: existingBookings } = await supabase
             .from('bookings')
-            .select('*')
+            .select('seat_number')
             .eq('ride_id', ride_id)
-            .eq('seat_number', seat_number)
-            .maybeSingle();
+            .in('seat_number', seatNumbers);
 
-        if (existingBooking) {
-            return res.status(400).json({ error: 'Seat already booked' });
+        if (existingBookings && existingBookings.length > 0) {
+            const bookedList = existingBookings.map(b => b.seat_number).join(', ');
+            return res.status(400).json({ error: `Места ${bookedList} уже забронированы` });
         }
 
-        const { data: booking, error } = await supabase
+        // 2. Bulk Insert
+        const { data: insertedBookings, error } = await supabase
             .from('bookings')
-            .insert([{ ride_id, passenger_id, seat_number, passenger_gender }])
-            .select('id')
-            .single();
+            .insert(bookingsToInsert)
+            .select('id');
 
         if (error) throw error;
 
-        res.json({ id: booking.id, status: 'confirmed' });
+        res.json({ ids: insertedBookings.map(b => b.id), status: 'confirmed' });
 
         // Telegram Notifications
         try {
@@ -82,9 +100,15 @@ router.post('/', async (req, res) => {
             if (rideData && userData) {
                 const dateStr = rideData.date;
                 const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
+                
+                // Format seats string: "2 (М), 3 (Ж)"
+                const seatsString = bookingsToInsert.map(b => {
+                    const genderLabel = b.passenger_gender === 'male' ? 'М' : 'Ж';
+                    return `${b.seat_number} (${genderLabel})`;
+                }).join(', ');
 
                 // Notify passenger
-                const passMsg = `✅ <b>Бронирование подтверждено!</b>\n\n🚗 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr}\n⏰ <b>Время:</b> ${timeStr}\n💺 <b>Место:</b> ${seat_number}\n\n<i>Водитель уведомлен. Приятной поездки!</i>`;
+                const passMsg = `✅ <b>Бронирование подтверждено!</b>\n\n🚗 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr}\n⏰ <b>Время:</b> ${timeStr}\n💺 <b>Места:</b> ${seatsString}\n\n<i>Водитель уведомлен. Приятной поездки!</i>`;
                 const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride_id}`;
                 const options = {
                     reply_markup: {
@@ -94,7 +118,7 @@ router.post('/', async (req, res) => {
                 sendPersonalMessage(passenger_id, passMsg, options);
 
                 // Notify driver
-                const driverMsg = `🔔 <b>Новая заявка на поездку!</b>\n\n🧑‍💻 <b>Пассажир:</b> ${userData.name}\n📞 <b>Телефон:</b> ${userData.phone || 'Не указан'}\n💺 <b>Выбранное место:</b> ${seat_number}\n\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}`;
+                const driverMsg = `🔔 <b>Новая заявка на поездку! (Мульти-бронь)</b>\n\n🧑‍💻 <b>Пассажир:</b> ${userData.name}\n📞 <b>Телефон:</b> ${userData.phone || 'Не указан'}\n💺 <b>Выбранные места:</b> ${seatsString}\n\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}`;
                 const optionsDriver = {
                     reply_markup: {
                         inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
