@@ -79,6 +79,34 @@ const { sendBroadcast, sendPersonalMessage } = require('../utils/telegramBot');
  *               items:
  *                 $ref: '#/components/schemas/Ride'
  */
+
+router.get('/check-limit', async (req, res) => {
+    const { driver_id } = req.query;
+    if (!driver_id) return res.status(400).json({ error: 'Missing driver_id' });
+    
+    try {
+        const { data: activeRides } = await supabase
+            .from('rides')
+            .select('date, time')
+            .eq('driver_id', driver_id)
+            .eq('status', 'active')
+            .eq('is_passenger_entry', false);
+
+        const futureActiveRides = (activeRides || []).filter(ride => {
+            const t = ride.time ? ride.time : '00:00:00';
+            const rideDateTime = new Date(`${ride.date}T${t}`);
+            return new Date() < rideDateTime;
+        });
+
+        res.json({ 
+            exceedsLimit: futureActiveRides.length >= 2, 
+            count: futureActiveRides.length 
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/', async (req, res) => {
     const { from, to, date, all_status } = req.query;
     try {
