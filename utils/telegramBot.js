@@ -40,19 +40,28 @@ async function sendMessage(chatId, text, options = {}) {
  * @param {number|string} [rideId] - Optional ID of the ride to link directly to it.
  */
 async function sendBroadcast(text, rideId = null) {
+    console.log(`[Telegram Broadcast] Starting broadcast. rideId: ${rideId}`);
+    
     // Fetch all saved groups from our database
     const { data: groups, error } = await supabase
         .from('telegram_groups')
         .select('chat_id');
 
-    if (error || !groups || groups.length === 0) {
-        console.log('Telegram Bot: No groups found in database to broadcast to.');
+    if (error) {
+        console.error('[Telegram Broadcast] Database error fetching groups:', error.message);
+        return false;
+    }
+
+    if (!groups || groups.length === 0) {
+        console.log('[Telegram Broadcast] No groups found in database to broadcast to.');
         return false;
     }
 
     const inlineKeyboard = [];
 
-    const appUrl = process.env.MINI_APP_URL || 'https://poputki.online';
+    let appUrl = process.env.MINI_APP_URL || 'https://poputki.online';
+    // Ensure no trailing slash for clean URL concatenation
+    if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
 
     if (rideId) {
         inlineKeyboard.push([
@@ -70,12 +79,17 @@ async function sendBroadcast(text, rideId = null) {
         }
     };
 
+    console.log(`[Telegram Broadcast] Sending to ${groups.length} groups...`);
+
     // Send the message to all saved groups concurrently
     const broadcastPromises = groups.map(group =>
         sendMessage(group.chat_id, text, options)
     );
 
-    await Promise.all(broadcastPromises);
+    const results = await Promise.all(broadcastPromises);
+    const successCount = results.filter(r => r !== false).length;
+    console.log(`[Telegram Broadcast] Finished. Success: ${successCount}/${groups.length}`);
+    
     return true;
 }
 

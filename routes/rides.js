@@ -257,14 +257,16 @@ router.post('/', async (req, res) => {
             .eq('status', 'active')
             .eq('is_passenger_entry', false);
 
-        const hasFutureActiveRide = (activeRides || []).some(ride => {
+        const futureActiveRides = (activeRides || []).filter(ride => {
             const t = ride.time ? ride.time : '00:00:00';
             const rideDateTime = new Date(`${ride.date}T${t}`);
             return new Date() < rideDateTime;
         });
 
-        if (hasFutureActiveRide && !is_passenger_entry) {
-            return res.status(400).json({ error: 'У вас уже есть активная поездка в будущем. Завершите её, чтобы создать новую.' });
+        console.log(`[Ride Creation] driver_id: ${driver_id}, is_passenger_entry: ${is_passenger_entry}, futureActiveRides: ${futureActiveRides.length}`);
+
+        if (futureActiveRides.length >= 2 && !is_passenger_entry) {
+            return res.status(400).json({ error: 'У вас уже есть 2 активных рейса в будущем. Завершите их, чтобы создать новый.' });
         }
 
         if (!is_passenger_entry && price) {
@@ -320,7 +322,8 @@ router.post('/', async (req, res) => {
 
         if (is_passenger_entry) {
             const broadcastMsg = `🙋 ПАССАЖИР ИЩЕТ ПОЕЗДКУ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}`;
-            sendBroadcast(broadcastMsg, ride.id);
+            console.log(`[Ride Creation] Broadcasting passenger entry: ${ride.id}`);
+            await sendBroadcast(broadcastMsg, ride.id);
 
             const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
             const personalMsg = `✅ <b>Ваша заявка опубликована!</b>\n\n${broadcastMsg}`;
@@ -329,11 +332,12 @@ router.post('/', async (req, res) => {
                     inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
                 }
             };
-            sendPersonalMessage(driver_id, personalMsg, options);
+            await sendPersonalMessage(driver_id, personalMsg, options);
         } else {
             const deliveryText = allows_delivery ? '\n📦 Беру посылки' : '';
             const broadcastMsg = `🚗 ВОДИТЕЛЬ ИЩЕТ ПАССАЖИРОВ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n 💺 Свободных мест: ${seats}${deliveryText}`;
-            sendBroadcast(broadcastMsg, ride.id);
+            console.log(`[Ride Creation] Broadcasting driver entry: ${ride.id}`);
+            await sendBroadcast(broadcastMsg, ride.id);
 
             const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
             const personalMsg = `✅ <b>Ваш рейс опубликован!</b>\n\n${broadcastMsg}`;
@@ -342,7 +346,7 @@ router.post('/', async (req, res) => {
                     inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
                 }
             };
-            sendPersonalMessage(driver_id, personalMsg, options);
+            await sendPersonalMessage(driver_id, personalMsg, options);
         }
 
     } catch (err) {
