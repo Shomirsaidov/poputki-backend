@@ -108,7 +108,7 @@ router.post('/', async (req, res) => {
                 }).join(', ');
 
                 // Notify passenger
-                const passMsg = `✅ <b>Бронирование подтверждено!</b>\n\n🚗 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr}\n⏰ <b>Время:</b> ${timeStr}\n💺 <b>Места:</b> ${seatsString}\n\n<i>Водитель уведомлен. Приятной поездки!</i>`;
+                const passMsg = `✅ <b>Бронирование подтверждено!</b>\n\n🚗 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr}\n⏰ <b>Время:</b> ${timeStr}\n💺 <b>Места:</b> ${seatsString}\n\n<i>Водитель уведомлен. Приятной поездки!</i>\n\nPoputki.online — это информационный сервис (агрегатор), а не перевозчик.`;
                 const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride_id}`;
                 const options = {
                     reply_markup: {
