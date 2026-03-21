@@ -130,18 +130,44 @@ router.get('/', async (req, res) => {
             .order('id', { ascending: false });
 
         if (from) query = query.ilike('from_city', `%${from}%`);
-        if (to) query = query.ilike('to_city', `%${to}%`);
+        // We will filter 'to' in-memory or via complex query to include intermediate stops
         if (date) query = query.gte('departure_date', date);
 
         const { data: tickets, error } = await query;
         if (error) throw error;
 
-        const result = tickets.map(t => ({
-            ...t,
-            reserved_seats: typeof t.reserved_seats === 'string' ? JSON.parse(t.reserved_seats || '[]') : (t.reserved_seats || []),
-            departure_time: t.departure_time ? t.departure_time.substring(0, 5) : t.departure_time,
-            arrival_time: t.arrival_time ? t.arrival_time.substring(0, 5) : t.arrival_time
-        }));
+        let result = tickets.map(t => {
+            const stops = (typeof t.intermediate_stops === 'string' ? JSON.parse(t.intermediate_stops || '[]') : (t.intermediate_stops || [])).map(s => ({
+                ...s,
+                time: s.time ? s.time.substring(0, 5) : s.time
+            }));
+
+            return {
+                ...t,
+                intermediate_stops: stops,
+                reserved_seats: typeof t.reserved_seats === 'string' ? JSON.parse(t.reserved_seats || '[]') : (t.reserved_seats || []),
+                departure_time: t.departure_time ? t.departure_time.substring(0, 5) : t.departure_time,
+                arrival_time: t.arrival_time ? t.arrival_time.substring(0, 5) : t.arrival_time
+            };
+        });
+
+        // If 'to' search is provided, filter or find matching stop
+        if (to) {
+            const toLower = to.toLowerCase();
+            result = result.filter(t => {
+                // Check final destination
+                if (t.to_city.toLowerCase().includes(toLower)) return true;
+                
+                // Check stops
+                const matchingStop = t.intermediate_stops.find(s => s.city.toLowerCase().includes(toLower));
+                if (matchingStop) {
+                    t.matchingStop = matchingStop; // Flag the match for frontend
+                    return true;
+                }
+                return false;
+            });
+        }
+
         res.json(result);
     } catch (err) {
         res.status(500).json({ error: err.message });
