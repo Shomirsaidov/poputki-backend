@@ -206,7 +206,7 @@ router.post('/:id/cancel', async (req, res) => {
         const dateStr = rideData.date;
         const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
         const passengerName = passengerData ? passengerData.name : 'Пассажир';
-        const passengerPhone = passengerData ? (passengerData.phone ? `+${passengerData.phone}` : 'Не указан') : 'Не указан';
+        const passengerPhone = passengerData ? (passengerData.phone ? `${passengerData.phone}` : 'Не указан') : 'Не указан';
 
         const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${booking.ride_id}`;
         const options = {

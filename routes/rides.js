@@ -673,7 +673,7 @@ router.post('/:id/delivery-request', async (req, res) => {
         const dateStr = ride.date;
         const timeStr = ride.time ? ride.time.substring(0, 5) : '';
 
-        const msg = `📦 <b>ЗАПРОС НА ОТПРАВКУ ПОСЫЛКИ</b>\n\nПользователь <b>${passenger.name || 'Один из пользователей'}</b> хочет передать посылку через вашу поездку:\n📍 <b>Маршрут:</b> ${ride.from_city} ➡ ${ride.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n📞 <b>Свяжитесь с ним по номеру:</b> +${passenger.phone}`;
+        const msg = `📦 <b>ЗАПРОС НА ОТПРАВКУ ПОСЫЛКИ</b>\n\nПользователь <b>${passenger.name || 'Один из пользователей'}</b> хочет передать посылку через вашу поездку:\n📍 <b>Маршрут:</b> ${ride.from_city} ➡ ${ride.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n📞 <b>Свяжитесь с ним по номеру:</b> ${passenger.phone}`;
 
         // Send to driver
         const personalMsgSuccess = await sendPersonalMessage(ride.driver_id, msg);
