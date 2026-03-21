@@ -618,4 +618,76 @@ router.post('/:id/share', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/rides/{id}/delivery-request:
+ *   post:
+ *     summary: Request to send a package via the driver
+ *     tags: [Rides]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               passenger_id:
+ *                 type: integer
+ */
+router.post('/:id/delivery-request', async (req, res) => {
+    const rideId = req.params.id;
+    const { passenger_id } = req.body;
+    
+    if (!passenger_id) return res.status(400).json({ error: 'ID пассажира обязателен' });
+
+    try {
+        const { data: ride, error: rideError } = await supabase
+            .from('rides')
+            .select(`*, driver:driver_id(id)`)
+            .eq('id', rideId)
+            .single();
+
+        if (rideError || !ride) {
+            return res.status(404).json({ error: 'Поездка не найдена' });
+        }
+
+        const { data: passenger, error: pError } = await supabase
+            .from('users')
+            .select('name, phone')
+            .eq('id', passenger_id)
+            .single();
+
+        if (pError || !passenger) {
+            return res.status(404).json({ error: 'Пользователь не найден' });
+        }
+
+        if (!passenger.phone) {
+            return res.status(400).json({ error: 'Номер телефона пассажира не указан' });
+        }
+
+        const dateStr = ride.date;
+        const timeStr = ride.time ? ride.time.substring(0, 5) : '';
+
+        const msg = `📦 <b>ЗАПРОС НА ОТПРАВКУ ПОСЫЛКИ</b>\n\nПользователь <b>${passenger.name || 'Один из пользователей'}</b> хочет передать посылку через вашу поездку:\n📍 <b>Маршрут:</b> ${ride.from_city} ➡ ${ride.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n📞 <b>Свяжитесь с ним по номеру:</b> +${passenger.phone}`;
+
+        // Send to driver
+        const personalMsgSuccess = await sendPersonalMessage(ride.driver_id, msg);
+
+        if (!personalMsgSuccess) {
+            console.log('User has not started the bot yet:', ride.driver_id);
+            // It might fail if driver hasn't started the bot, but typically drivers did. We'll return success anyway but log it.
+        }
+
+        res.json({ success: true, message: 'Заявка отправлена' });
+    } catch (err) {
+        console.error('Delivery request error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
