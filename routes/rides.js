@@ -247,7 +247,7 @@ router.post('/', async (req, res) => {
 
         if (userError || !userExists) {
             console.error(`[Ride Creation] Driver ${driver_id} not found in database.`);
-            return res.status(401).json({ error: 'Ваша сессия устарела. Пожалуйста, выйдите из профиля и войдите снова.' });
+            return res.status(401).json({ error: 'Приложение работает правильно в телеграм боте' });
         }
 
         const { data: activeRides } = await supabase
@@ -323,9 +323,10 @@ router.post('/', async (req, res) => {
             sendBroadcast(broadcastMsg, ride.id);
 
             const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
+            const personalMsg = `✅ <b>Ваша заявка опубликована!</b>\n\n${broadcastMsg}`;
             const options = {
                 reply_markup: {
-                    inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                    inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
                 }
             };
             sendPersonalMessage(driver_id, personalMsg, options);
@@ -335,9 +336,10 @@ router.post('/', async (req, res) => {
             sendBroadcast(broadcastMsg, ride.id);
 
             const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
+            const personalMsg = `✅ <b>Ваш рейс опубликован!</b>\n\n${broadcastMsg}`;
             const options = {
                 reply_markup: {
-                    inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                    inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
                 }
             };
             sendPersonalMessage(driver_id, personalMsg, options);
@@ -568,7 +570,7 @@ router.post('/:id/share', async (req, res) => {
         const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${driver_ride_id}`;
         const options = {
             reply_markup: {
-                inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
             }
         };
 

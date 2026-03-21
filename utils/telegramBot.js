@@ -56,7 +56,7 @@ async function sendBroadcast(text, rideId = null) {
 
     if (rideId) {
         inlineKeyboard.push([
-            { text: 'Подробнее', url: `${appUrl}/ride/${rideId}` }
+            { text: 'Подробнее', web_app: { url: `${appUrl}/ride/${rideId}` } }
         ]);
     }
 

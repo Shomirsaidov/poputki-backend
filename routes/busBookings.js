@@ -42,7 +42,7 @@ router.post('/', async (req, res) => {
         .maybeSingle();
 
     if (userError || !userExists) {
-        return res.status(401).json({ error: 'Ваша сессия устарела. Пожалуйста, выйдите из профиля и войдите снова.' });
+        return res.status(401).json({ error: 'Приложение работает правильно в телеграм боте' });
     }
     if (!seat_numbers || !seat_numbers.length) {
         return res.status(400).json({ error: 'Seat numbers required' });
@@ -126,7 +126,8 @@ router.post('/', async (req, res) => {
             `💺 <b>Количество мест:</b> ${seat_numbers.length} (Места: ${seat_numbers.join(', ')})\n` +
             `👥 <b>Пассажиры:</b>${passengersList}\n\n` +
             `💰 <b>Общая стоимость:</b> ${totalPrice} сом\n\n` +
-            `<i>Пожалуйста, сохраните этот билет. Счастливого пути!</i>`;
+            `<i>Пожалуйста, сохраните этот билет. Счастливого пути!</i>\n\n` +
+            `Poputki.online — это информационный сервис (агрегатор), а не перевозчик`;
 
         sendPersonalMessage(passenger_id, ticketMsg);
 

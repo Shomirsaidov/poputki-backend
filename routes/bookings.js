@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
                 const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride_id}`;
                 const options = {
                     reply_markup: {
-                        inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                        inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
                     }
                 };
                 sendPersonalMessage(passenger_id, passMsg, options);
@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
                 const driverMsg = `🔔 <b>Новая заявка на поездку! (Мульти-бронь)</b>\n\n🧑‍💻 <b>Пассажир:</b> ${userData.name}\n📞 <b>Телефон:</b> ${userData.phone || 'Не указан'}\n💺 <b>Выбранные места:</b> ${seatsString}\n\n📍 <b>Маршрут:</b> ${rideData.from_city} ➡ ${rideData.to_city}\n🗓 <b>Дата:</b> ${dateStr} в ${timeStr}`;
                 const optionsDriver = {
                     reply_markup: {
-                        inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                        inline_keyboard: [[{ text: 'Открыть поездку', web_app: { url: rideUrl } }]]
                     }
                 };
                 sendPersonalMessage(rideData.driver_id, driverMsg, optionsDriver);
