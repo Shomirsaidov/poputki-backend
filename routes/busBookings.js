@@ -114,7 +114,8 @@ router.post('/', async (req, res) => {
 
         let passengersList = '';
         passengers_data.forEach((p, idx) => {
-            passengersList += `\n${idx + 1}. ${p.firstName} ${p.lastName} (${p.documentType} ${p.documentNumber})`;
+            const genderStr = p.gender === 'male' ? 'Муж.' : (p.gender === 'female' ? 'Жен.' : '');
+            passengersList += `\n${idx + 1}. ${p.lastName || ''} ${p.firstName || ''} (${genderStr}) - Место: ${seat_numbers[idx] || '—'} [${p.docType || 'Док'}: ${p.docNumber || '—'}]`;
         });
 
         const ticketMsg = `🎫 <b>ЭЛЕКТРОННЫЙ БИЛЕТ НА АВТОБУС</b> 🎫\n\n` +
@@ -134,9 +135,9 @@ router.post('/', async (req, res) => {
             const driverMsg = `🔔 <b>НОВОЕ БРОНИРОВАНИЕ</b> 🚌\n\n` +
                 `📍 <b>Маршрут:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
                 `🗓 <b>Дата/время:</b> ${dateStr} в ${timeStr}\n\n` +
-                `👤 <b>Пассажир (телефон):</b> ${phone}\n` +
+                `👤 <b>Основной контакт:</b> ${phone}\n` +
                 `💺 <b>Места:</b> ${seat_numbers.join(', ')} (${seat_numbers.length} чел.)\n` +
-                `👥 <b>Список:</b>${passengersList}\n\n` +
+                `👥 <b>Список пассажиров:</b>${passengersList}\n\n` +
                 `💰 <b>Сумма:</b> ${totalPrice} сом`;
 
             sendPersonalMessage(ticket.operator_id, driverMsg);
