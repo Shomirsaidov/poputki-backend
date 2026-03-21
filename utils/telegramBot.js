@@ -42,36 +42,59 @@ async function sendMessage(chatId, text, options = {}) {
 async function sendBroadcast(text, rideId = null) {
     console.log(`[Telegram Broadcast] Starting broadcast. rideId: ${rideId}`);
     
-    // Fetch all saved groups from our database
-    const { data: groups, error } = await supabase
+    // 1. Collect group IDs from multiple sources
+    const groupIds = new Set();
+    
+    // Source A: Environment Variable (can be comma-separated list)
+    if (process.env.TELEGRAM_BROADCAST_GROUP_ID) {
+        process.env.TELEGRAM_BROADCAST_GROUP_ID.split(',').forEach(id => {
+            const trimmed = id.trim();
+            if (trimmed) groupIds.add(trimmed);
+        });
+    }
+
+    // Source B: Database
+    const { data: dbGroups, error } = await supabase
         .from('telegram_groups')
         .select('chat_id');
 
     if (error) {
         console.error('[Telegram Broadcast] Database error fetching groups:', error.message);
+    } else if (dbGroups) {
+        dbGroups.forEach(g => {
+            if (g.chat_id) groupIds.add(g.chat_id.toString());
+        });
+    }
+
+    const uniqueGroups = Array.from(groupIds);
+
+    if (uniqueGroups.length === 0) {
+        console.log('[Telegram Broadcast] No groups found to broadcast to (check .env and database).');
         return false;
     }
 
-    if (!groups || groups.length === 0) {
-        console.log('[Telegram Broadcast] No groups found in database to broadcast to.');
-        return false;
-    }
-
+    // 2. Prepare the keyboard with safe deep links for groups
     const inlineKeyboard = [];
 
-    let appUrl = process.env.MINI_APP_URL || 'https://poputki.online';
-    // Ensure no trailing slash for clean URL concatenation
-    if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
-
+    // The BOT_LINK or bot username should be used for deep linking
+    // Pattern: https://t.me/bot_username/app?startapp=param
+    const botUsername = 'poputkionline_bot'; // From BOT_LINK 'https://t.me/poputkionline_bot'
+    
     if (rideId) {
         inlineKeyboard.push([
-            { text: 'Подробнее', web_app: { url: `${appUrl}/ride/${rideId}` } }
+            { 
+                text: '🚀 Подробнее в приложении', 
+                url: `https://t.me/${botUsername}/app?startapp=ride_${rideId}` 
+            }
+        ]);
+    } else {
+        inlineKeyboard.push([
+            { 
+                text: '📱 Открыть приложение', 
+                url: `https://t.me/${botUsername}/app` 
+            }
         ]);
     }
-
-    inlineKeyboard.push([
-        { text: 'Открыть приложение', url: 'https://t.me/poputkionline_bot' }
-    ]);
 
     const options = {
         reply_markup: {
@@ -79,18 +102,23 @@ async function sendBroadcast(text, rideId = null) {
         }
     };
 
-    console.log(`[Telegram Broadcast] Sending to ${groups.length} groups...`);
+    console.log(`[Telegram Broadcast] Sending to ${uniqueGroups.length} unique groups: ${uniqueGroups.join(', ')}`);
 
-    // Send the message to all saved groups concurrently
-    const broadcastPromises = groups.map(group =>
-        sendMessage(group.chat_id, text, options)
-    );
+    // 3. Send the message to all groups and collect results
+    const results = await Promise.all(uniqueGroups.map(async (chatId) => {
+        const result = await sendMessage(chatId, text, options);
+        if (result === false) {
+            console.error(`[Telegram Broadcast] FAILED for group ${chatId}`);
+        } else {
+            console.log(`[Telegram Broadcast] SUCCESS for group ${chatId}`);
+        }
+        return result;
+    }));
 
-    const results = await Promise.all(broadcastPromises);
     const successCount = results.filter(r => r !== false).length;
-    console.log(`[Telegram Broadcast] Finished. Success: ${successCount}/${groups.length}`);
+    console.log(`[Telegram Broadcast] Finished. Success: ${successCount}/${uniqueGroups.length}`);
     
-    return true;
+    return successCount > 0;
 }
 
 /**
