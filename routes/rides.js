@@ -569,7 +569,7 @@ router.post('/:id/share', async (req, res) => {
         const driverPhone = driverRide.users ? driverRide.users.phone : '';
 
         // Add to telegram queue or send right away
-        const msg = `🚗 <b>ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ ПОЕЗДКИ</b>\n\nВодитель <b>${driverName}</b> предлагает вам присоединиться к его поездке:\n📍 <b>Маршрут:</b> ${driverRide.from_city} ➡ ${driverRide.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💵 <b>Цена от:</b> ${driverRide.price} с.\n\n📞 <b>Связаться с водителем:</b> +${driverPhone}\n\n<i>Откройте список поездок, найдите водителя и забронируйте место!</i>`;
+        const msg = `🚗 <b>ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ ПОЕЗДКИ</b>\n\nВодитель <b>${driverName}</b> предлагает вам присоединиться к его поездке:\n📍 <b>Маршрут:</b> ${driverRide.from_city} ➡ ${driverRide.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💵 <b>Цена от:</b> ${driverRide.price} с.\n\n<i>Откройте список поездок, найдите водителя и забронируйте место!</i>`;
 
         const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${driver_ride_id}`;
         const options = {
