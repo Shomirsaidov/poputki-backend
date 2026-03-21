@@ -231,7 +231,7 @@ router.get('/:id', async (req, res) => {
         // Calculate premium seats for double-decker
         let premiumSeats = [];
         if (ticket.bus_type === 'double') {
-            premiumSeats = [69, 70, 71, 72, 73, 74, 75, 76, 53, 54, 55, 56];
+            premiumSeats = [1, 2, 3, 4];
         }
 
         res.json({ ...ticket, bookings, bookedSeats, seatGenders, premiumSeats });
