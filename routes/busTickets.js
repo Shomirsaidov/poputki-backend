@@ -74,6 +74,9 @@ router.post('/', async (req, res) => {
                         const r = await uploadToCloudinary(photo, { folder: 'poputki/bus_photos' });
                         photoResults.push({ url: r.url, public_id: r.public_id });
                     } catch(e) { console.error('Cloudinary upload error:', e); }
+                } else if (typeof photo === 'object' && photo.url && photo.public_id) {
+                    // Already uploaded from frontend
+                    photoResults.push(photo);
                 }
             }
         }
