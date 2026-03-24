@@ -39,8 +39,8 @@ async function sendMessage(chatId, text, options = {}) {
  * @param {string} text - HTML formatted message text.
  * @param {number|string} [rideId] - Optional ID of the ride to link directly to it.
  */
-async function sendBroadcast(text, rideId = null) {
-    console.log(`[Telegram Broadcast] Starting broadcast. rideId: ${rideId}`);
+async function sendBroadcast(text, rideId = null, type = 'ride') {
+    console.log(`[Telegram Broadcast] Starting broadcast. rideId: ${rideId}, type: ${type}`);
     
     // 1. Collect group IDs from multiple sources
     const groupIds = new Set();
@@ -81,10 +81,11 @@ async function sendBroadcast(text, rideId = null) {
     const botUsername = 'poputkionline_bot'; // From BOT_LINK 'https://t.me/poputkionline_bot'
     
     if (rideId) {
+        const prefix = type === 'bus' ? 'bus' : 'ride';
         inlineKeyboard.push([
             { 
                 text: '🚀 Подробнее в приложении', 
-                url: `https://t.me/${botUsername}?start=ride_${rideId}` 
+                url: `https://t.me/${botUsername}?start=${prefix}_${rideId}` 
             }
         ]);
     } else {

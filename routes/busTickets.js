@@ -93,7 +93,7 @@ router.post('/', async (req, res) => {
             ? `\n🛑 Остановки: ${intermediate_stops.map(s => s.city).join(', ')}`
             : '';
         const broadcastMsg = `🚌 НОВЫЙ АВТОБУСНЫЙ РЕЙС\n📍 Маршрут: ${from_city} ➡ ${to_city}${stopsText}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n💰 Цена: ${price} сом\n🏢 Перевозчик: ${transport_company}`;
-        sendBroadcast(broadcastMsg, ticket.id);
+        sendBroadcast(broadcastMsg, ticket.id, 'bus');
 
     } catch (err) {
         res.status(500).json({ error: err.message });
