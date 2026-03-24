@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../db');
 const { sendBroadcast } = require('../utils/telegramBot');
+const { uploadToCloudinary } = require('../utils/cloudinaryUtils');
 
 /**
  * @swagger
@@ -62,9 +63,21 @@ router.post('/', async (req, res) => {
         departure_date, departure_time, arrival_date, arrival_time,
         duration_minutes, price, total_seats,
         bus_type, passenger_comments, intermediate_stops,
-        floor1_seats, floor2_seats, premium_price
+        floor1_seats, floor2_seats, premium_price, photos
     } = req.body;
     try {
+        let photoResults = [];
+        if (photos && Array.isArray(photos)) {
+            for (const photo of photos) {
+                if (typeof photo === 'string' && photo.startsWith('data:image')) {
+                    try {
+                        const r = await uploadToCloudinary(photo, { folder: 'poputki/bus_photos' });
+                        photoResults.push({ url: r.url, public_id: r.public_id });
+                    } catch(e) { console.error('Cloudinary upload error:', e); }
+                }
+            }
+        }
+
         const { data: ticket, error } = await supabase
             .from('bus_tickets')
             .insert([{
@@ -77,7 +90,8 @@ router.post('/', async (req, res) => {
                 intermediate_stops: intermediate_stops || [],
                 floor1_seats: floor1_seats || null,
                 floor2_seats: floor2_seats || null,
-                premium_price: premium_price || null
+                premium_price: premium_price || null,
+                photos: photoResults
             }])
             .select('id')
             .single();

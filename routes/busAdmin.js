@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../db');
+const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinaryUtils');
 
 /**
  * @swagger
@@ -128,11 +129,42 @@ router.put('/tickets/:id', async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
     
-    // Remove id from updateData to prevent primary key update issues
+    // Remove metadata fields from updateData
     delete updateData.id;
     delete updateData.created_at;
+    const incomingPhotos = updateData.photos;
+    delete updateData.photos; // we will process and attach later
 
     try {
+        // Fetch existing ticket to compare photos
+        const { data: oldTicket } = await supabase.from('bus_tickets').select('photos').eq('id', id).single();
+        const oldPhotos = oldTicket?.photos || [];
+
+        let newPhotoResults = [];
+        if (incomingPhotos && Array.isArray(incomingPhotos)) {
+            for (const photo of incomingPhotos) {
+                if (typeof photo === 'string' && photo.startsWith('data:image')) {
+                    try {
+                        const r = await uploadToCloudinary(photo, { folder: 'poputki/bus_photos' });
+                        newPhotoResults.push({ url: r.url, public_id: r.public_id });
+                    } catch(e) { console.error('Cloudinary upload error in PUT:', e); }
+                } else if (typeof photo === 'object' && photo.url && photo.public_id) {
+                    // Keep existing photo
+                    newPhotoResults.push(photo);
+                }
+            }
+        }
+
+        const oldPublicIds = oldPhotos.map(p => p.public_id).filter(id => id);
+        const newPublicIds = newPhotoResults.map(p => p.public_id).filter(id => id);
+
+        const idsToDelete = oldPublicIds.filter(id => !newPublicIds.includes(id));
+        for (const pid of idsToDelete) {
+            await deleteFromCloudinary(pid);
+        }
+
+        updateData.photos = newPhotoResults;
+
         const { error } = await supabase
             .from('bus_tickets')
             .update(updateData)
@@ -162,12 +194,24 @@ router.delete('/tickets/:id', async (req, res) => {
     const { id } = req.params;
 
     try {
+        // Fetch to get photos before deleting
+        const { data: ticket } = await supabase.from('bus_tickets').select('photos').eq('id', id).single();
+        const photos = ticket?.photos || [];
+
         const { error } = await supabase
             .from('bus_tickets')
             .delete()
             .eq('id', id);
 
         if (error) throw error;
+
+        // Cleanup cloudinary
+        for (const photo of photos) {
+            if (photo && photo.public_id) {
+                await deleteFromCloudinary(photo.public_id);
+            }
+        }
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

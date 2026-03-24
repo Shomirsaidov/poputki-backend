@@ -3,6 +3,14 @@ const cors = require('cors');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
+const { v2: cloudinary } = require('cloudinary');
+
+cloudinary.config({
+    cloud_name: 'dlmnievol',
+    api_key: '365173165178178',
+    api_secret: 'RHw8S9slXFHNEzxvKKltYiCgfnE',
+    secure: true,
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
