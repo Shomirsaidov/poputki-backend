@@ -27,7 +27,7 @@ router.post('/login', (req, res) => {
     const { passcode } = req.body;
     console.log(`[Admin Login Attempt] Passcode received: ${passcode ? '***' + passcode.slice(-2) : 'NONE'}`);
     
-    if (passcode === ADMIN_PASSCODE) {
+    if (String(passcode) === String(ADMIN_PASSCODE)) {
         console.log(`[Admin Login Success] Standard passcode used`);
         res.json({ token: ADMIN_SECRET_TOKEN });
     } else {

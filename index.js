@@ -27,15 +27,25 @@ app.use(cors({
         // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         
-        // Log the origin for debugging
-        console.log(`[CORS Request] Origin: ${origin}`);
-        
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-            console.error(`[CORS Error] Blocked origin: ${origin}`);
-            return callback(new Error(msg), false);
+        // Final Robust Check:
+        // 1. Check exact matches
+        // 2. Check if it ends with .poputki.online
+        // 3. Check for localhost
+        const isAllowed = 
+            allowedOrigins.indexOf(origin) !== -1 || 
+            origin.endsWith('.poputki.online') ||
+            origin.includes('localhost');
+
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            // CRITICAL: We do NOT pass an Error object here.
+            // Passing an error to the callback triggers Express's error handler (often returning 500).
+            // Passing (null, false) will simply not set the Access-Control-Allow-Origin header,
+            // which tells the browser to block the request without crashing the server.
+            console.error(`[CORS Blocked] Origin: ${origin}`);
+            callback(null, false);
         }
-        return callback(null, true);
     }
 }));
 app.use(express.json({ limit: '50mb' }));
