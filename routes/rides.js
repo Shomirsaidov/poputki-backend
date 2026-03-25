@@ -132,7 +132,7 @@ router.get('/', async (req, res) => {
 
         // Flatten the relations
         const formattedRides = rides.map(r => {
-            const userData = r.users || {};
+            const userData = Array.isArray(r.users) ? r.users[0] : (r.users || {});
             delete r.users;
             return {
                 ...r,
@@ -181,7 +181,7 @@ router.get('/:id', async (req, res) => {
 
         if (rideError || !rideRaw) return res.status(404).json({ error: 'Ride not found' });
 
-        const userData = rideRaw.users || {};
+        const userData = Array.isArray(rideRaw.users) ? rideRaw.users[0] : (rideRaw.users || {});
         delete rideRaw.users;
 
         const ride = {
