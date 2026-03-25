@@ -2,12 +2,38 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../db');
 
+const ADMIN_PASSCODE = '941206'; // Tricky 6-digit code
+const ADMIN_SECRET_TOKEN = 'poputki-admin-super-secret-token-2026';
+
+// Middleware to verify admin token
+function adminAuth(req, res, next) {
+    const token = req.headers['x-admin-token'];
+    if (token === ADMIN_SECRET_TOKEN) {
+        next();
+    } else {
+        res.status(401).json({ error: 'Unauthorized: Admin access required' });
+    }
+}
+
 /**
  * @swagger
  * tags:
  *   name: Admin
  *   description: Administrative operations
  */
+
+// Admin Login
+router.post('/login', (req, res) => {
+    const { passcode } = req.body;
+    if (passcode === ADMIN_PASSCODE) {
+        res.json({ token: ADMIN_SECRET_TOKEN });
+    } else {
+        res.status(401).json({ error: 'Неверный код доступа' });
+    }
+});
+
+// Protect all following routes
+router.use(adminAuth);
 
 // Dashboard Stats
 router.get('/stats', async (req, res) => {
