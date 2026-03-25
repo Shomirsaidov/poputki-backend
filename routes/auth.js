@@ -102,7 +102,7 @@ router.post('/login', async (req, res) => {
             if (insertError) throw insertError;
             user = { ...newUser, isNew: true };
         } else {
-            user.isNew = !user.phone || !user.age || !user.name; // user is new if they haven't completed profile
+            user.isNew = !user.phone || !user.age || !user.name || user.age <= 0; // user is new if they haven't completed profile
         }
         res.json({ user, token: 'mock-token-' + user.id });
     } catch (err) {
@@ -380,8 +380,8 @@ router.post('/telegram-login', async (req, res) => {
             }
         }
 
-        // Set isNew flag if they haven't provided enough info yet
-        user.isNew = !user.phone || !user.age || !user.name;
+        // Set isNew flag if they haven't provided enough info yet (name, age, phone)
+        user.isNew = !user.phone || !user.age || !user.name || user.age <= 0;
 
         res.json({ user, token: 'tg-token-' + user.id });
     } catch (err) {
