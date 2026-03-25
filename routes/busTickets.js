@@ -208,7 +208,10 @@ router.get('/:id', async (req, res) => {
     try {
         const { data: ticket, error: ticketError } = await supabase
             .from('bus_tickets')
-            .select('*')
+            .select(`
+                *,
+                operator:users!operator_id (phone)
+            `)
             .eq('id', req.params.id)
             .single();
 
@@ -251,7 +254,14 @@ router.get('/:id', async (req, res) => {
             premiumSeats = [1, 2, 3, 4];
         }
 
-        res.json({ ...ticket, bookings, bookedSeats, seatGenders, premiumSeats });
+        res.json({ 
+            ...ticket, 
+            operator_phone: ticket.operator?.phone,
+            bookings, 
+            bookedSeats, 
+            seatGenders, 
+            premiumSeats 
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

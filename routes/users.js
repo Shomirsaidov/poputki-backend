@@ -243,7 +243,8 @@ router.get('/:id/bus-bookings', async (req, res) => {
                 bus_tickets!inner (
                     from_city, to_city, from_address, to_address,
                     departure_date, departure_time, arrival_date, arrival_time,
-                    transport_company, price, duration_minutes
+                    transport_company, price, duration_minutes,
+                    operator:users!operator_id (phone)
                 )
             `)
             .eq('passenger_id', req.params.id)
@@ -257,6 +258,7 @@ router.get('/:id/bus-bookings', async (req, res) => {
             return {
                 ...b,
                 ...ticketData,
+                operator_phone: ticketData.operator?.phone,
                 departure_time: ticketData.departure_time ? ticketData.departure_time.substring(0, 5) : ticketData.departure_time,
                 arrival_time: ticketData.arrival_time ? ticketData.arrival_time.substring(0, 5) : ticketData.arrival_time,
                 seat_numbers: typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : b.seat_numbers,
