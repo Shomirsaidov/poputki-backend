@@ -114,7 +114,8 @@ router.get('/', async (req, res) => {
             .from('rides')
             .select(`
                 *,
-                users:driver_id (name, rating, phone)
+                users:driver_id (name, rating, phone),
+                bookings:bookings(id)
             `)
             .order('id', { ascending: false });
 
@@ -139,7 +140,8 @@ router.get('/', async (req, res) => {
                 driver_name: userData.name,
                 driver_rating: userData.rating,
                 driver_phone: userData.phone,
-                time: r.time ? r.time.substring(0, 5) : r.time
+                time: r.time ? r.time.substring(0, 5) : r.time,
+                booked_seats: r.bookings ? r.bookings.length : 0
             };
         });
 
