@@ -431,6 +431,30 @@ router.post('/:id/complete', async (req, res) => {
             .eq('id', id);
 
         res.json({ success: true });
+
+        // Notify passengers to leave a review
+        const { data: bookings } = await supabase
+            .from('bookings')
+            .select('passenger_id')
+            .eq('ride_id', id);
+
+        if (bookings && bookings.length > 0) {
+            const reviewMsg = `🏁 <b>ПОЕЗДКА ЗАВЕРШЕНА!</b>\n\nКак прошла ваша поездка? Пожалуйста, оставьте отзыв о водителе, чтобы помочь другим пользователям!`;
+            const reviewUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/my-rides?reviewRideId=${id}`;
+            const options = {
+                reply_markup: {
+                    inline_keyboard: [[{ text: '⭐ Оставить отзыв', web_app: { url: reviewUrl } }]]
+                }
+            };
+
+            for (const booking of bookings) {
+                try {
+                    await sendPersonalMessage(booking.passenger_id, reviewMsg, options);
+                } catch (notifyErr) {
+                    console.error(`Failed to notify passenger ${booking.passenger_id}:`, notifyErr);
+                }
+            }
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
