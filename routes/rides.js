@@ -153,6 +153,88 @@ router.get('/', async (req, res) => {
 
 /**
  * @swagger
+ * /api/rides/my:
+ *   get:
+ *     summary: Get user's rides (as driver or passenger)
+ *     tags: [Rides]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of rides
+ */
+router.get('/my', async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+
+    try {
+        // Query 1: Rides where user is driver
+        const { data: driverRides, error: error1 } = await supabase
+            .from('rides')
+            .select(`
+                *,
+                users:driver_id (name, rating, phone),
+                bookings:bookings(id, passenger_id, seat_number, status, passenger_gender)
+            `)
+            .eq('driver_id', userId)
+            .order('id', { ascending: false });
+
+        if (error1) throw error1;
+
+        // Query 2: Rides where user is passenger (via bookings)
+        const { data: passengerBookings, error: error2 } = await supabase
+            .from('bookings')
+            .select(`
+                ride_id,
+                rides:ride_id (
+                    *,
+                    users:driver_id (name, rating, phone),
+                    bookings:bookings(id, passenger_id, seat_number, status, passenger_gender)
+                )
+            `)
+            .eq('passenger_id', userId);
+
+        if (error2) throw error2;
+
+        const passengerRides = passengerBookings
+            .map(b => b.rides)
+            .filter(r => r !== null);
+
+        // Combine and unique by ID
+        const allRidesMap = new Map();
+        [...driverRides, ...passengerRides].forEach(r => {
+            allRidesMap.set(r.id, r);
+        });
+        
+        const uniqueRides = Array.from(allRidesMap.values())
+            .sort((a, b) => b.id - a.id);
+
+        // Format response
+        const formattedRides = uniqueRides.map(r => {
+            const userData = Array.isArray(r.users) ? r.users[0] : (r.users || {});
+            return {
+                ...r,
+                driver_name: userData.name,
+                driver_rating: userData.rating,
+                driver_phone: userData.phone,
+                time: r.time ? r.time.substring(0, 5) : r.time,
+                booked_seats: r.bookings ? r.bookings.length : 0
+            };
+        });
+
+        res.json(formattedRides);
+    } catch (err) {
+        console.error('Fetch my rides error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
  * /api/rides/{id}:
  *   get:
  *     summary: Get ride details
