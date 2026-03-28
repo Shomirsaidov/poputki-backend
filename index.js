@@ -27,22 +27,13 @@ app.use(cors({
         // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         
-        // Final Robust Check:
-        // 1. Check exact matches
-        // 2. Check if it ends with .poputki.online
-        // 3. Check for localhost
-        const isAllowed = 
-            allowedOrigins.indexOf(origin) !== -1 || 
-            origin.endsWith('.poputki.online') ||
-            origin.includes('localhost');
+        // Robust check for allowed origins
+        const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+        const isProduction = origin.endsWith('poputki.online');
 
-        if (isAllowed) {
+        if (isLocalhost || isProduction) {
             callback(null, true);
         } else {
-            // CRITICAL: We do NOT pass an Error object here.
-            // Passing an error to the callback triggers Express's error handler (often returning 500).
-            // Passing (null, false) will simply not set the Access-Control-Allow-Origin header,
-            // which tells the browser to block the request without crashing the server.
             console.error(`[CORS Blocked] Origin: ${origin}`);
             callback(null, false);
         }
