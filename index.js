@@ -15,30 +15,7 @@ cloudinary.config({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = [
-    'https://poputki.online',
-    'https://www.poputki.online',
-    'http://localhost:5173',
-    'http://localhost:3000'
-];
-
-app.use(cors({
-    origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        // Robust check for allowed origins
-        const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
-        const isProduction = origin.endsWith('poputki.online') || origin === 'https://poputki.online' || origin === 'https://www.poputki.online';
-
-        if (isLocalhost || isProduction) {
-            callback(null, true);
-        } else {
-            console.error(`[CORS Blocked] Origin: ${origin}`);
-            callback(null, false);
-        }
-    }
-}));
+app.use(cors()); // Allow all origins
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
