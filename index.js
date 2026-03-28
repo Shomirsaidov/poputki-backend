@@ -29,7 +29,7 @@ app.use(cors({
         
         // Robust check for allowed origins
         const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
-        const isProduction = origin.endsWith('poputki.online');
+        const isProduction = origin.endsWith('poputki.online') || origin === 'https://poputki.online' || origin === 'https://www.poputki.online';
 
         if (isLocalhost || isProduction) {
             callback(null, true);
