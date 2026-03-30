@@ -5,7 +5,7 @@ const crypto = require('crypto');
 
 // Professional Telegram initData verification
 // Hardcoded Bot Token to ensure consistency across services
-const BOT_TOKEN = '8669833278:AAFHxzU9jZUZIWVrHdogUsYrkQmd_F05MZA';
+const BOT_TOKEN = '8669833278:AAE2RYNpP530Nt1bDmXnbcNSg4qL_cKRNQA';
 
 function verifyTelegramData(initData) {
     if (!initData) return false;
