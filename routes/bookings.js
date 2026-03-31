@@ -191,6 +191,11 @@ router.post('/:id/cancel', async (req, res) => {
             return res.status(400).json({ error: 'Нельзя отменить бронь после начала поездки' });
         }
 
+        const { error: deleteError } = await supabase
+            .from('bookings')
+            .delete()
+            .eq('id', id);
+
         if (deleteError) throw deleteError;
 
         // Fetch passenger details for notification
