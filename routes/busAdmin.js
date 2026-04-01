@@ -296,4 +296,77 @@ router.post('/bookings/manual', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/bus-admin/bookings/{id}:
+ *   put:
+ *     summary: Update an existing booking
+ *     tags: [Bus Admin]
+ */
+router.put('/bookings/:id', async (req, res) => {
+    const { id } = req.params;
+    const { seat_numbers, passengers_data, phone, passenger_name, pickup_city, drop_off_city } = req.body;
+
+    try {
+        // 1. Get the current booking to know old seats and ticket_id
+        const { data: oldBooking, error: obErr } = await supabase
+            .from('bus_ticket_bookings')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (obErr || !oldBooking) return res.status(404).json({ error: 'Booking not found' });
+
+        const ticketId = oldBooking.bus_ticket_id;
+
+        // 2. If seats changed, check for conflicts and update ticket.reserved_seats
+        if (JSON.stringify(oldBooking.seat_numbers) !== JSON.stringify(seat_numbers)) {
+            const { data: ticket, error: tErr } = await supabase
+                .from('bus_tickets')
+                .select('reserved_seats')
+                .eq('id', ticketId)
+                .single();
+
+            if (tErr) throw tErr;
+
+            const reserved = typeof ticket.reserved_seats === 'string' ? JSON.parse(ticket.reserved_seats || '[]') : (ticket.reserved_seats || []);
+            
+            // Remove old seats from the reserved list
+            const withoutOld = reserved.filter(s => !oldBooking.seat_numbers.includes(s));
+            
+            // Check for conflicts with new seats (excluding the seats we just "released")
+            const conflict = seat_numbers.some(s => withoutOld.includes(s));
+            if (conflict) return res.status(400).json({ error: 'One or more of the new seats are already taken' });
+
+            const newReserved = [...withoutOld, ...seat_numbers];
+
+            // Update ticket
+            await supabase
+                .from('bus_tickets')
+                .update({ reserved_seats: newReserved })
+                .eq('id', ticketId);
+        }
+
+        // 3. Update the booking record
+        const { error: updateErr } = await supabase
+            .from('bus_ticket_bookings')
+            .update({
+                seat_numbers,
+                passenger_count: seat_numbers.length,
+                passengers_data,
+                phone,
+                passenger_name,
+                pickup_city,
+                drop_off_city
+            })
+            .eq('id', id);
+
+        if (updateErr) throw updateErr;
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
