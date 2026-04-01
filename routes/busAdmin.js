@@ -103,10 +103,11 @@ router.get('/bookings', async (req, res) => {
         const { data: bookings, error: bErr } = await supabase
             .from('bus_ticket_bookings')
             .select(`
-                *,
+                id, bus_ticket_id, passenger_id, seat_numbers, passenger_count, passengers_data, phone, status, total_price, passenger_name, pickup_city, drop_off_city, created_at,
                 users:passenger_id (name, phone)
             `)
             .in('bus_ticket_id', ticketIds)
+            .neq('status', 'cancelled')
             .order('created_at', { ascending: false });
 
         if (bErr) throw bErr;
