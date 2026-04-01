@@ -32,7 +32,7 @@ const { sendPersonalMessage } = require('../utils/telegramBot');
  *                 type: string
  */
 router.post('/', async (req, res) => {
-    const { bus_ticket_id, passenger_id, seat_numbers, passengers_data, phone } = req.body;
+    const { bus_ticket_id, passenger_id, seat_numbers, passengers_data, phone, pickup_city, drop_off_city } = req.body;
 
     // Verify user exists to avoid foreign key violation (common after DB reset)
     const { data: userExists, error: userError } = await supabase
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
         if (conflict) return res.status(400).json({ error: 'Одно или несколько мест уже заняты' });
 
         // Calculate price with premium seat support
-        const premiumSeatNums = ticket.bus_type === 'double' ? [69, 70, 71, 72, 73, 74, 75, 76, 53, 54, 55, 56] : [];
+        const premiumSeatNums = ticket.bus_type === 'double' ? [1, 2, 3, 4, 69, 70, 71, 72, 73, 74, 75, 76] : [];
         const premiumPrice = ticket.premium_price || ticket.price;
         let totalPrice = 0;
         for (const seatNum of seat_numbers) {
@@ -93,7 +93,9 @@ router.post('/', async (req, res) => {
                 passengers_data: passengers_data,
                 phone,
                 status: 'confirmed',
-                total_price: totalPrice
+                total_price: totalPrice,
+                pickup_city,
+                drop_off_city
             }])
             .select('id')
             .single();
@@ -121,6 +123,7 @@ router.post('/', async (req, res) => {
         const ticketMsg = `🎫 <b>ЭЛЕКТРОННЫЙ БИЛЕТ НА АВТОБУС</b> 🎫\n\n` +
             `✅ <b>Статус:</b> Забронировано\n` +
             `🚌 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+            `📍 <b>Маршрут:</b> ${pickup_city || ticket.from_city} ➡ ${drop_off_city || ticket.to_city}\n` +
             `🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n` +
             `📞 <b>Покупатель:</b> ${phone}\n` +
             `💺 <b>Количество мест:</b> ${seat_numbers.length} (Места: ${seat_numbers.join(', ')})\n` +
@@ -134,7 +137,8 @@ router.post('/', async (req, res) => {
         // Driver Notification
         if (ticket.operator_id) {
             const driverMsg = `🔔 <b>НОВОЕ БРОНИРОВАНИЕ</b> 🚌\n\n` +
-                `📍 <b>Маршрут:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+                `📍 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+                `маршрут: <b>${pickup_city || ticket.from_city} ➡ ${drop_off_city || ticket.to_city}</b>\n` +
                 `🗓 <b>Дата/время:</b> ${dateStr} в ${timeStr}\n\n` +
                 `👤 <b>Основной контакт:</b> ${phone}\n` +
                 `💺 <b>Места:</b> ${seat_numbers.join(', ')} (${seat_numbers.length} чел.)\n` +

@@ -249,9 +249,10 @@ router.get('/:id', async (req, res) => {
         });
 
         // Calculate premium seats for double-decker
-        let premiumSeats = [];
+        let premiumSeats = [1, 2, 3, 4]; // Default front seats 2nd floor
         if (ticket.bus_type === 'double') {
-            premiumSeats = [1, 2, 3, 4];
+            // Add table seats (1st floor)
+            premiumSeats = [...premiumSeats, 69, 70, 71, 72, 73, 74, 75, 76];
         }
 
         res.json({ 

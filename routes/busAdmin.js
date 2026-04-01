@@ -228,7 +228,7 @@ router.delete('/tickets/:id', async (req, res) => {
  *     tags: [Bus Admin]
  */
 router.post('/bookings/manual', async (req, res) => {
-    const { bus_ticket_id, operator_id, seat_numbers, passengers_data, phone, passenger_name } = req.body;
+    const { bus_ticket_id, operator_id, seat_numbers, passengers_data, phone, passenger_name, pickup_city, drop_off_city } = req.body;
 
     try {
         const { data: ticket, error: tErr } = await supabase
@@ -256,7 +256,9 @@ router.post('/bookings/manual', async (req, res) => {
                 phone,
                 status: 'confirmed',
                 total_price: 0, // Manual booking
-                passenger_name: passenger_name // Store name for table display
+                passenger_name: passenger_name, // Store name for table display
+                pickup_city,
+                drop_off_city
             }])
             .select('id')
             .single();
