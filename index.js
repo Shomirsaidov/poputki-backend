@@ -31,14 +31,19 @@ app.use((req, res, next) => {
 
 // Security Header Check Middleware
 app.use((req, res, next) => {
-    // Skip for OPTIONS (CORS) and /health and /api-docs (if needed)
-    if (req.method === 'OPTIONS' || req.url === '/health' || req.url.startsWith('/api-docs')) {
+    // Skip security check for: CORS, Health, API Docs, and Phone Redirects
+    if (
+        req.method === 'OPTIONS' || 
+        req.url === '/health' || 
+        req.url.startsWith('/api-docs') ||
+        req.url.startsWith('/api/call/')
+    ) {
         return next();
     }
     
     const clientHeader = req.headers['x-mana-man'];
     if (clientHeader !== 'nasa.2006') {
-        console.warn(`[SECURITY] 403 Forbidden - Missing or invalid header from ${req.ip}`);
+        console.warn(`[SECURITY] 403 Forbidden - Missing or invalid header from ${req.ip} for ${req.url}`);
         return res.status(403).json({ error: 'Forbidden' });
     }
     next();
@@ -46,6 +51,13 @@ app.use((req, res, next) => {
 
 app.get("/health", (req, res) => {
     res.status(200).send("ok");
+});
+
+// Redirect for phone calls (workaround for Telegram Mini App)
+app.get("/api/call/:phone", (req, res) => {
+    const { phone } = req.params;
+    console.log(`[WORKAROUND] Redirecting to tel:${phone}`);
+    res.redirect(`tel:${phone}`);
 });
 
 // Swagger Configuration
