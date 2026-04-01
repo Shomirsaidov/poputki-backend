@@ -14,45 +14,40 @@ cloudinary.config({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Manual origin check middleware (No CORS library)
+// Enhanced manual origin check middleware
 app.use((req, res, next) => {
     const origin = req.get('Origin');
     const referer = req.get('Referer') || '';
     
-    // Explicitly allow both production and common development origins
-    const allowedOrigins = [
-        'https://poputki.online', 
-        'https://www.poputki.online',
-        'http://poputki.online',
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:3000'
-    ];
+    // Pattern to allow production domain (including subdomains) and local development
+    const allowedPattern = /^(https?:\/\/(www\.)?poputki\.online|http:\/\/localhost:\d+|http:\/\/127\.0\.0\.1:\d+)/;
     
-    // Check if the current request origin is allowed
-    const isAllowed = allowedOrigins.includes(origin) || allowedOrigins.some(a => referer.startsWith(a));
-    
-    // CORS headers - ALWAYS send for allowed origins to prevent browser errors
-    if (isAllowed && origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
+    const isOriginMatch = origin && allowedPattern.test(origin);
+    const isRefererMatch = referer && allowedPattern.test(referer);
+    const isAllowed = isOriginMatch || isRefererMatch;
+
+    // Apply CORS headers for allowed traffic
+    if (isAllowed) {
+        // Use the actual origin if present, otherwise default to production domain
+        const corsOrigin = isOriginMatch ? origin : 'https://poputki.online';
+        res.setHeader('Access-Control-Allow-Origin', corsOrigin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, x-telegram-init-data');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
 
-    // Handle Preflight OPTIONS requests
-    if (req.method === 'OPTIONS') {
+    // Always handle Preflight for allowed patterns
+    if (req.method === 'OPTIONS' && isAllowed) {
         return res.sendStatus(200);
     }
 
-    // Exception for health check
+    // Health check bypass
     if (req.path === '/health') return next();
 
-    // Reject all other unauthorized traffic
+    // Block strictly unauthorized traffic
     if (!isAllowed) {
-        console.warn(`[SECURITY] Blocked request from: ${origin || referer || 'Unknown'}`);
-        return res.status(403).json({ error: 'Access forbidden: unauthorized origin' });
+        console.warn(`[SECURITY] Blocked request from unauthorized source. Origin: ${origin}, Referer: ${referer}`);
+        return res.status(403).json({ error: 'Access denied: unauthorized origin' });
     }
 
     next();
