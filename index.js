@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
@@ -14,50 +15,31 @@ cloudinary.config({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Enhanced manual origin check middleware
-app.use((req, res, next) => {
-    const origin = req.get('Origin');
-    const referer = req.get('Referer') || '';
-    
-    // Pattern to allow production domain (including subdomains) and local development
-    const allowedPattern = /^(https?:\/\/(www\.)?poputki\.online|http:\/\/localhost:\d+|http:\/\/127\.0\.0\.1:\d+)/;
-    
-    const isOriginMatch = origin && allowedPattern.test(origin);
-    const isRefererMatch = referer && allowedPattern.test(referer);
-    const isAllowed = isOriginMatch || isRefererMatch;
-
-    // Apply CORS headers for allowed traffic
-    if (isAllowed) {
-        // Use the actual origin if present, otherwise default to production domain
-        const corsOrigin = isOriginMatch ? origin : 'https://poputki.online';
-        res.setHeader('Access-Control-Allow-Origin', corsOrigin);
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, x-telegram-init-data');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-
-    // Always handle Preflight for allowed patterns
-    if (req.method === 'OPTIONS' && isAllowed) {
-        return res.sendStatus(200);
-    }
-
-    // Health check bypass
-    if (req.path === '/health') return next();
-
-    // Block strictly unauthorized traffic
-    if (!isAllowed) {
-        console.warn(`[SECURITY] Blocked request from unauthorized source. Origin: ${origin}, Referer: ${referer}`);
-        return res.status(403).json({ error: 'Access denied: unauthorized origin' });
-    }
-
-    next();
-});
+app.use(cors({
+    origin: '*',
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Token', 'x-mana-man']
+})); // Allow all origins
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Request logging middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
+// Security Header Check Middleware
+app.use((req, res, next) => {
+    // Skip for OPTIONS (CORS) and /health and /api-docs (if needed)
+    if (req.method === 'OPTIONS' || req.url === '/health' || req.url.startsWith('/api-docs')) {
+        return next();
+    }
+    
+    const clientHeader = req.headers['x-mana-man'];
+    if (clientHeader !== 'nasa.2006') {
+        console.warn(`[SECURITY] 403 Forbidden - Missing or invalid header from ${req.ip}`);
+        return res.status(403).json({ error: 'Forbidden' });
+    }
     next();
 });
 
