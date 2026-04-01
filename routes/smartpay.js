@@ -100,6 +100,10 @@ router.post('/create-invoice', async (req, res) => {
         const returnUrl = `${FRONTEND_URL}/payment-result?order_id=${paymentOrderId}`;
         const description = `Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
 
+        // Build customer name from first passenger
+        const firstPassenger = passengers_data[0] || {};
+        const customerName = `${firstPassenger.lastName || ''} ${firstPassenger.firstName || ''} ${firstPassenger.middleName || ''}`.trim();
+
         const invoiceResponse = await fetch(`${SMARTPAY_BASE_URL}/invoices`, {
             method: 'POST',
             headers: {
@@ -112,7 +116,10 @@ router.post('/create-invoice', async (req, res) => {
                 order_id: paymentOrderId,
                 return_url: returnUrl,
                 lifetime: 1800,
-                customer_phone: phone ? phone.replace(/^\+992/, '').replace(/\D/g, '') : undefined
+                customer_phone: phone ? phone.replace(/^\+992/, '').replace(/\D/g, '') : undefined,
+                qty: seat_numbers.length,
+                unit_price: ticket.price,
+                name: customerName || undefined
             })
         });
 
