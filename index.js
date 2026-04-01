@@ -61,6 +61,7 @@ const busBookingsRoutes = require('./routes/busBookings');
 const adminRoutes = require('./routes/admin');
 const generalRoutes = require('./routes/general');
 const ridesRoutes = require('./routes/rides');
+const smartpayRoutes = require('./routes/smartpay');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -74,6 +75,7 @@ app.use('/api/bus-ticket-bookings', busBookingsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/rides', ridesRoutes);
+app.use('/api/payments', smartpayRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
