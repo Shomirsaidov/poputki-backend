@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
@@ -15,7 +14,38 @@ cloudinary.config({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // Allow all origins
+// Manual origin check middleware (No CORS library)
+app.use((req, res, next) => {
+    const origin = req.get('Origin');
+    const referer = req.get('Referer') || '';
+    const allowedOrigins = ['https://poputki.online', 'https://www.poputki.online'];
+    
+    // CORS headers for the allowed origin
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    // Handle Preflight
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+
+    // Strict access control
+    const isAllowed = allowedOrigins.includes(origin) || allowedOrigins.some(a => referer.startsWith(a));
+    
+    // Exception for health check
+    if (req.path === '/health') return next();
+
+    if (!isAllowed) {
+        console.warn(`[SECURITY] Blocked request from unauthorized origin: ${origin || referer || 'Unknown'}`);
+        return res.status(403).json({ error: 'Forbidden: Access only allowed from poputki.online' });
+    }
+
+    next();
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
