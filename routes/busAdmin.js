@@ -36,16 +36,33 @@ router.get('/tickets', async (req, res) => {
 
         if (error) throw error;
 
-        const result = tickets.map(t => ({
-            ...t,
-            reserved_seats: typeof t.reserved_seats === 'string' ? JSON.parse(t.reserved_seats || '[]') : (t.reserved_seats || []),
-            intermediate_stops: (typeof t.intermediate_stops === 'string' ? JSON.parse(t.intermediate_stops || '[]') : (t.intermediate_stops || [])).map(s => ({
-                ...s,
-                time: s.time ? s.time.substring(0, 5) : s.time
-            })),
-            departure_time: t.departure_time ? t.departure_time.substring(0, 5) : t.departure_time,
-            arrival_time: t.arrival_time ? t.arrival_time.substring(0, 5) : t.arrival_time
-        }));
+        // Fetch all relevant bookings to calculate accurate reserved seats (including pending_payment)
+        const ticketIds = tickets.map(t => t.id);
+        const { data: allBookings } = await supabase
+            .from('bus_ticket_bookings')
+            .select('bus_ticket_id, seat_numbers')
+            .in('bus_ticket_id', ticketIds)
+            .in('status', ['confirmed', 'pending_payment']);
+
+        const result = tickets.map(t => {
+            const ticketBookings = (allBookings || []).filter(b => b.bus_ticket_id === t.id);
+            const actuallyReserved = [];
+            ticketBookings.forEach(b => {
+                const seats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+                actuallyReserved.push(...seats);
+            });
+
+            return {
+                ...t,
+                reserved_seats: actuallyReserved,
+                intermediate_stops: (typeof t.intermediate_stops === 'string' ? JSON.parse(t.intermediate_stops || '[]') : (t.intermediate_stops || [])).map(s => ({
+                    ...s,
+                    time: s.time ? s.time.substring(0, 5) : s.time
+                })),
+                departure_time: t.departure_time ? t.departure_time.substring(0, 5) : t.departure_time,
+                arrival_time: t.arrival_time ? t.arrival_time.substring(0, 5) : t.arrival_time
+            };
+        });
 
         res.json(result);
     } catch (err) {

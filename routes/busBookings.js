@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
             .from('bus_ticket_bookings')
             .select('seat_numbers')
             .eq('bus_ticket_id', bus_ticket_id)
-            .eq('status', 'confirmed');
+            .in('status', ['confirmed', 'pending_payment']);
 
         const takenSeats = [];
         (existingBookings || []).forEach(b => {
