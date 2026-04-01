@@ -18,30 +18,41 @@ const PORT = process.env.PORT || 3000;
 app.use((req, res, next) => {
     const origin = req.get('Origin');
     const referer = req.get('Referer') || '';
-    const allowedOrigins = ['https://poputki.online', 'https://www.poputki.online'];
     
-    // CORS headers for the allowed origin
-    if (origin && allowedOrigins.includes(origin)) {
+    // Explicitly allow both production and common development origins
+    const allowedOrigins = [
+        'https://poputki.online', 
+        'https://www.poputki.online',
+        'http://poputki.online',
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:3000'
+    ];
+    
+    // Check if the current request origin is allowed
+    const isAllowed = allowedOrigins.includes(origin) || allowedOrigins.some(a => referer.startsWith(a));
+    
+    // CORS headers - ALWAYS send for allowed origins to prevent browser errors
+    if (isAllowed && origin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
 
-    // Handle Preflight
+    // Handle Preflight OPTIONS requests
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
     }
 
-    // Strict access control
-    const isAllowed = allowedOrigins.includes(origin) || allowedOrigins.some(a => referer.startsWith(a));
-    
     // Exception for health check
     if (req.path === '/health') return next();
 
+    // Reject all other unauthorized traffic
     if (!isAllowed) {
-        console.warn(`[SECURITY] Blocked request from unauthorized origin: ${origin || referer || 'Unknown'}`);
-        return res.status(403).json({ error: 'Forbidden: Access only allowed from poputki.online' });
+        console.warn(`[SECURITY] Blocked request from: ${origin || referer || 'Unknown'}`);
+        return res.status(403).json({ error: 'Access forbidden: unauthorized origin' });
     }
 
     next();
