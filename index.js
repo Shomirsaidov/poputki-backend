@@ -19,6 +19,7 @@ app.use(cors({
     origin: '*',
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Token', 'x-mana-man']
 })); // Allow all origins
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
