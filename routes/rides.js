@@ -523,11 +523,11 @@ router.post('/:id/complete', async (req, res) => {
             .eq('ride_id', id);
 
         if (bookings && bookings.length > 0) {
-            const reviewMsg = `🏁 <b>ПОЕЗДКА ЗАВЕРШЕНА!</b>\n\nКак прошла ваша поездка? Пожалуйста, оставьте отзыв о водителе, чтобы помочь другим пользователям!`;
+            const reviewMsg = `🏁 <b>Поездка завершена!</b>\n\nПожалуйста, оставьте отзыв о водителе.`;
             const reviewUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/my-rides?reviewRideId=${id}`;
             const options = {
                 reply_markup: {
-                    inline_keyboard: [[{ text: '⭐ Оставить отзыв', web_app: { url: reviewUrl } }]]
+                    inline_keyboard: [[{ text: 'Оставить отзыв', web_app: { url: reviewUrl } }]]
                 }
             };
 
