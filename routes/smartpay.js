@@ -41,12 +41,12 @@ router.post('/create-invoice', async (req, res) => {
 
         if (ticketError || !ticket) return res.status(404).json({ error: 'Ticket not found' });
 
-        // Check seat availability
+        // Check seat availability against actual confirmed bookings only
         const { data: existingBookings } = await supabase
             .from('bus_ticket_bookings')
             .select('seat_numbers')
             .eq('bus_ticket_id', bus_ticket_id)
-            .in('status', ['confirmed', 'pending_payment']);
+            .eq('status', 'confirmed');
 
         const takenSeats = [];
         (existingBookings || []).forEach(b => {
@@ -89,13 +89,6 @@ router.post('/create-invoice', async (req, res) => {
 
         if (insertError) throw insertError;
 
-        // Reserve seats immediately to prevent double-booking
-        const allTakenSeats = [...takenSeats, ...seat_numbers];
-        await supabase
-            .from('bus_tickets')
-            .update({ reserved_seats: allTakenSeats })
-            .eq('id', bus_ticket_id);
-
         // Create SmartPay invoice
         const returnUrl = `${FRONTEND_URL}/payment-result?order_id=${paymentOrderId}`;
         const description = `Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
@@ -126,10 +119,8 @@ router.post('/create-invoice', async (req, res) => {
         const invoiceData = await invoiceResponse.json();
 
         if (!invoiceResponse.ok || !invoiceData.payment_link) {
-            // Rollback: delete the booking and unreserve seats
+            // Rollback: delete the booking
             await supabase.from('bus_ticket_bookings').delete().eq('id', booking.id);
-            const restoredSeats = takenSeats; // revert to before our seats
-            await supabase.from('bus_tickets').update({ reserved_seats: restoredSeats }).eq('id', bus_ticket_id);
             return res.status(502).json({ error: 'Ошибка создания платежа. Попробуйте позже.' });
         }
 
@@ -187,11 +178,46 @@ router.get('/verify/:order_id', async (req, res) => {
         const paymentStatus = statusData.status;
 
         if (paymentStatus === 'Charged') {
-            // Payment successful — confirm booking
+            const ticketId = booking.bus_ticket_id;
+            
+            // Check for seat conflicts before confirming
+            const { data: confirmedBookings } = await supabase
+                .from('bus_ticket_bookings')
+                .select('seat_numbers')
+                .eq('bus_ticket_id', ticketId)
+                .eq('status', 'confirmed');
+                
+            const takenSeats = [];
+            (confirmedBookings || []).forEach(b => {
+                const s = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+                takenSeats.push(...s);
+            });
+            
+            const mySeats = typeof booking.seat_numbers === 'string' ? JSON.parse(booking.seat_numbers || '[]') : (booking.seat_numbers || []);
+            const conflict = mySeats.some(s => takenSeats.includes(s));
+
+            if (conflict) {
+                // Payment was charged but seats are taken. Mark for manual refund.
+                await supabase
+                    .from('bus_ticket_bookings')
+                    .update({ status: 'conflict_refund_needed' })
+                    .eq('id', booking.id);
+                
+                return res.json({ status: 'failed', error: 'Seats were taken by another user during payment. Please contact support for a refund.' });
+            }
+
+            // Payment successful and no conflict — confirm booking
             await supabase
                 .from('bus_ticket_bookings')
                 .update({ status: 'confirmed' })
                 .eq('id', booking.id);
+
+            // Officially reserve the seats
+            const allTakenSeats = [...new Set([...takenSeats, ...mySeats])];
+            await supabase
+                .from('bus_tickets')
+                .update({ reserved_seats: allTakenSeats })
+                .eq('id', ticketId);
 
             res.json({ status: 'confirmed', booking_id: booking.id });
 
@@ -238,33 +264,11 @@ router.get('/verify/:order_id', async (req, res) => {
             }
 
         } else if (paymentStatus === 'Expired' || paymentStatus === 'Rejected') {
-            // Payment failed — cancel booking and release seats
+            // Payment failed — cancel booking
             await supabase
                 .from('bus_ticket_bookings')
                 .update({ status: 'cancelled' })
                 .eq('id', booking.id);
-
-            // Release reserved seats
-            const ticket = booking.bus_tickets;
-            if (ticket) {
-                const { data: otherBookings } = await supabase
-                    .from('bus_ticket_bookings')
-                    .select('seat_numbers')
-                    .eq('bus_ticket_id', ticket.id)
-                    .in('status', ['confirmed', 'pending_payment'])
-                    .neq('id', booking.id);
-
-                const stillTaken = [];
-                (otherBookings || []).forEach(b => {
-                    const seats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
-                    stillTaken.push(...seats);
-                });
-
-                await supabase
-                    .from('bus_tickets')
-                    .update({ reserved_seats: stillTaken })
-                    .eq('id', ticket.id);
-            }
 
             res.json({ status: 'failed', reason: paymentStatus });
 
