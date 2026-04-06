@@ -181,7 +181,7 @@ router.post('/create-invoice', async (req, res) => {
         if (insertError) throw insertError;
 
         // Create SmartPay invoice
-        const returnUrl = `${FRONTEND_URL}/payment-result?order_id=${paymentOrderId}`;
+        const returnUrl = 'https://poputki-backend.onrender.com/api/payments/webhook';
         const description = `Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
 
         // Build customer name from first passenger
