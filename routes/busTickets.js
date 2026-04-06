@@ -229,7 +229,7 @@ router.get('/:id', async (req, res) => {
             .from('bus_ticket_bookings')
             .select('*')
             .eq('bus_ticket_id', ticket.id)
-            .in('status', ['confirmed', 'pending_payment']);
+            .eq('status', 'confirmed');
 
         if (bookingsError) throw bookingsError;
 

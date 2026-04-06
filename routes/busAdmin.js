@@ -42,7 +42,7 @@ router.get('/tickets', async (req, res) => {
             .from('bus_ticket_bookings')
             .select('bus_ticket_id, seat_numbers')
             .in('bus_ticket_id', ticketIds)
-            .in('status', ['confirmed', 'pending_payment']);
+            .in('status', ['confirmed']);
 
         const result = tickets.map(t => {
             const ticketBookings = (allBookings || []).filter(b => b.bus_ticket_id === t.id);
