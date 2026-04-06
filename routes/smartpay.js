@@ -58,7 +58,7 @@ async function processSuccessfulPayment(booking) {
     if (ticket) {
         const dateStr = ticket.departure_date;
         const timeStr = ticket.departure_time ? ticket.departure_time.substring(0, 5) : '';
-        const seatNums = booking.seat_numbers || [];
+        const seatNums = mySeats;
 
         let passengersList = '';
         const pData = booking.passengers_data || [];
