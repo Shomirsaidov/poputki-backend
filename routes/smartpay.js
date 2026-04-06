@@ -8,6 +8,97 @@ const SMARTPAY_BASE_URL = 'https://sandbox.smartpay.tj/api/merchant';
 const FRONTEND_URL = 'https://poputki.online';
 
 /**
+ * Helper function to process successful payments.
+ * It checks for seat conflicts, confirms the booking, updates reserved seats, and sends notifications.
+ */
+async function processSuccessfulPayment(booking) {
+    const ticketId = booking.bus_ticket_id;
+    
+    // Check for seat conflicts before confirming
+    const { data: confirmedBookings } = await supabase
+        .from('bus_ticket_bookings')
+        .select('seat_numbers')
+        .eq('bus_ticket_id', ticketId)
+        .eq('status', 'confirmed');
+        
+    const takenSeats = [];
+    (confirmedBookings || []).forEach(b => {
+        const s = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+        takenSeats.push(...s);
+    });
+    
+    const mySeats = typeof booking.seat_numbers === 'string' ? JSON.parse(booking.seat_numbers || '[]') : (booking.seat_numbers || []);
+    const conflict = mySeats.some(s => takenSeats.includes(s));
+
+    if (conflict) {
+        // Payment was charged but seats are taken. Mark for manual refund.
+        await supabase
+            .from('bus_ticket_bookings')
+            .update({ status: 'conflict_refund_needed' })
+            .eq('id', booking.id);
+        
+        return { status: 'failed', error: 'Seats were taken by another user during payment. Please contact support for a refund.' };
+    }
+
+    // Payment successful and no conflict — confirm booking
+    await supabase
+        .from('bus_ticket_bookings')
+        .update({ status: 'confirmed' })
+        .eq('id', booking.id);
+
+    // Officially reserve the seats
+    const allTakenSeats = [...new Set([...takenSeats, ...mySeats])];
+    await supabase
+        .from('bus_tickets')
+        .update({ reserved_seats: allTakenSeats })
+        .eq('id', ticketId);
+
+    // Send Telegram notifications (fire-and-forget)
+    const ticket = booking.bus_tickets;
+    if (ticket) {
+        const dateStr = ticket.departure_date;
+        const timeStr = ticket.departure_time ? ticket.departure_time.substring(0, 5) : '';
+        const seatNums = booking.seat_numbers || [];
+
+        let passengersList = '';
+        const pData = booking.passengers_data || [];
+        pData.forEach((p, idx) => {
+            const genderStr = p.gender === 'male' ? 'Муж.' : (p.gender === 'female' ? 'Жен.' : '');
+            passengersList += `\n${idx + 1}. ${p.lastName || ''} ${p.firstName || ''} (${genderStr}) - Место: ${seatNums[idx] || '—'} [${p.docType || 'Док'}: ${p.docNumber || '—'}]`;
+        });
+
+        const ticketMsg = `🎫 <b>ЭЛЕКТРОННЫЙ БИЛЕТ НА АВТОБУС</b> 🎫\n\n` +
+            `✅ <b>Статус:</b> Оплачено\n` +
+            `🚌 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+            `📍 <b>Маршрут:</b> ${booking.pickup_city || ticket.from_city} ➡ ${booking.drop_off_city || ticket.to_city}\n` +
+            `🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n` +
+            `📞 <b>Покупатель:</b> ${booking.phone}\n` +
+            `💺 <b>Количество мест:</b> ${seatNums.length} (Места: ${seatNums.join(', ')})\n` +
+            `👥 <b>Пассажиры:</b>${passengersList}\n\n` +
+            `💰 <b>Общая стоимость:</b> ${booking.total_price} сом\n\n` +
+            `<i>Пожалуйста, сохраните этот билет. Счастливого пути!</i>\n\n` +
+            `Poputki.online — это информационный сервис (агрегатор), а не перевозчик`;
+
+        sendPersonalMessage(booking.passenger_id, ticketMsg);
+
+        if (ticket.operator_id) {
+            const driverMsg = `🔔 <b>НОВОЕ БРОНИРОВАНИЕ (ОПЛАЧЕНО)</b> 🚌\n\n` +
+                `📍 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
+                `маршрут: <b>${booking.pickup_city || ticket.from_city} ➡ ${booking.drop_off_city || ticket.to_city}</b>\n` +
+                `🗓 <b>Дата/время:</b> ${dateStr} в ${timeStr}\n\n` +
+                `👤 <b>Основной контакт:</b> ${booking.phone}\n` +
+                `💺 <b>Места:</b> ${seatNums.join(', ')} (${seatNums.length} чел.)\n` +
+                `👥 <b>Список пассажиров:</b>${passengersList}\n\n` +
+                `💰 <b>Сумма:</b> ${booking.total_price} сом`;
+
+            sendPersonalMessage(ticket.operator_id, driverMsg);
+        }
+    }
+    
+    return { status: 'confirmed', booking_id: booking.id };
+}
+
+/**
  * POST /api/payments/create-invoice
  * Creates a booking with pending_payment status and a SmartPay invoice
  */
@@ -178,90 +269,8 @@ router.get('/verify/:order_id', async (req, res) => {
         const paymentStatus = statusData.status;
 
         if (paymentStatus === 'Charged') {
-            const ticketId = booking.bus_ticket_id;
-            
-            // Check for seat conflicts before confirming
-            const { data: confirmedBookings } = await supabase
-                .from('bus_ticket_bookings')
-                .select('seat_numbers')
-                .eq('bus_ticket_id', ticketId)
-                .eq('status', 'confirmed');
-                
-            const takenSeats = [];
-            (confirmedBookings || []).forEach(b => {
-                const s = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
-                takenSeats.push(...s);
-            });
-            
-            const mySeats = typeof booking.seat_numbers === 'string' ? JSON.parse(booking.seat_numbers || '[]') : (booking.seat_numbers || []);
-            const conflict = mySeats.some(s => takenSeats.includes(s));
-
-            if (conflict) {
-                // Payment was charged but seats are taken. Mark for manual refund.
-                await supabase
-                    .from('bus_ticket_bookings')
-                    .update({ status: 'conflict_refund_needed' })
-                    .eq('id', booking.id);
-                
-                return res.json({ status: 'failed', error: 'Seats were taken by another user during payment. Please contact support for a refund.' });
-            }
-
-            // Payment successful and no conflict — confirm booking
-            await supabase
-                .from('bus_ticket_bookings')
-                .update({ status: 'confirmed' })
-                .eq('id', booking.id);
-
-            // Officially reserve the seats
-            const allTakenSeats = [...new Set([...takenSeats, ...mySeats])];
-            await supabase
-                .from('bus_tickets')
-                .update({ reserved_seats: allTakenSeats })
-                .eq('id', ticketId);
-
-            res.json({ status: 'confirmed', booking_id: booking.id });
-
-            // Send Telegram notifications (fire-and-forget)
-            const ticket = booking.bus_tickets;
-            if (ticket) {
-                const dateStr = ticket.departure_date;
-                const timeStr = ticket.departure_time ? ticket.departure_time.substring(0, 5) : '';
-                const seatNums = booking.seat_numbers || [];
-
-                let passengersList = '';
-                const pData = booking.passengers_data || [];
-                pData.forEach((p, idx) => {
-                    const genderStr = p.gender === 'male' ? 'Муж.' : (p.gender === 'female' ? 'Жен.' : '');
-                    passengersList += `\n${idx + 1}. ${p.lastName || ''} ${p.firstName || ''} (${genderStr}) - Место: ${seatNums[idx] || '—'} [${p.docType || 'Док'}: ${p.docNumber || '—'}]`;
-                });
-
-                const ticketMsg = `🎫 <b>ЭЛЕКТРОННЫЙ БИЛЕТ НА АВТОБУС</b> 🎫\n\n` +
-                    `✅ <b>Статус:</b> Оплачено\n` +
-                    `🚌 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
-                    `📍 <b>Маршрут:</b> ${booking.pickup_city || ticket.from_city} ➡ ${booking.drop_off_city || ticket.to_city}\n` +
-                    `🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n` +
-                    `📞 <b>Покупатель:</b> ${booking.phone}\n` +
-                    `💺 <b>Количество мест:</b> ${seatNums.length} (Места: ${seatNums.join(', ')})\n` +
-                    `👥 <b>Пассажиры:</b>${passengersList}\n\n` +
-                    `💰 <b>Общая стоимость:</b> ${booking.total_price} сом\n\n` +
-                    `<i>Пожалуйста, сохраните этот билет. Счастливого пути!</i>\n\n` +
-                    `Poputki.online — это информационный сервис (агрегатор), а не перевозчик`;
-
-                sendPersonalMessage(booking.passenger_id, ticketMsg);
-
-                if (ticket.operator_id) {
-                    const driverMsg = `🔔 <b>НОВОЕ БРОНИРОВАНИЕ (ОПЛАЧЕНО)</b> 🚌\n\n` +
-                        `📍 <b>Рейс:</b> ${ticket.from_city} ➡ ${ticket.to_city}\n` +
-                        `маршрут: <b>${booking.pickup_city || ticket.from_city} ➡ ${booking.drop_off_city || ticket.to_city}</b>\n` +
-                        `🗓 <b>Дата/время:</b> ${dateStr} в ${timeStr}\n\n` +
-                        `👤 <b>Основной контакт:</b> ${booking.phone}\n` +
-                        `💺 <b>Места:</b> ${seatNums.join(', ')} (${seatNums.length} чел.)\n` +
-                        `👥 <b>Список пассажиров:</b>${passengersList}\n\n` +
-                        `💰 <b>Сумма:</b> ${booking.total_price} сом`;
-
-                    sendPersonalMessage(ticket.operator_id, driverMsg);
-                }
-            }
+            const result = await processSuccessfulPayment(booking);
+            return res.json(result);
 
         } else if (paymentStatus === 'Expired' || paymentStatus === 'Rejected') {
             // Payment failed — cancel booking
@@ -283,4 +292,51 @@ router.get('/verify/:order_id', async (req, res) => {
     }
 });
 
+
 module.exports = router;
+
+// Ensure webhook endpoint is exported below
+/**
+ * POST /api/payments/webhook
+ * Receives server-to-server notifications from the bank upon successful payment.
+ */
+router.post('/webhook', async (req, res) => {
+    const payload = req.body;
+    const { order_id } = payload;
+    
+    if (!order_id) {
+        return res.status(400).json({ error: 'Missing order_id' });
+    }
+
+    try {
+        // Query the booking associated with the webhook's order_id
+        const { data: booking, error: bookingError } = await supabase
+            .from('bus_ticket_bookings')
+            .select('*, bus_tickets(*)')
+            .eq('payment_order_id', order_id)
+            .single();
+
+        if (bookingError || !booking) {
+            console.error(`[WEBHOOK] Booking not found for order_id: ${order_id}`);
+            return res.status(404).json({ error: 'Бронь не найдена' });
+        }
+
+        // If already confirmed, acknowledge idempotently
+        if (booking.status === 'confirmed') {
+            console.log(`[WEBHOOK] Booking already confirmed for order: ${order_id}`);
+            return res.json({ status: 'already_confirmed', booking_id: booking.id });
+        }
+
+        // Run the main confirmation logic
+        const result = await processSuccessfulPayment(booking);
+        
+        console.log(`[WEBHOOK] Successfully processed order: ${order_id}. Result:`, result);
+        
+        // Respond HTTP 200 OK to the bank
+        res.json(result);
+
+    } catch (err) {
+        console.error(`[WEBHOOK ERROR] for order_id ${order_id}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
