@@ -210,7 +210,7 @@ router.get('/:id', async (req, res) => {
             .from('bus_tickets')
             .select(`
                 *,
-                operator:users!operator_id (phone)
+                operator:users!operator_id (phone, service_fee_percent)
             `)
             .eq('id', req.params.id)
             .single();
@@ -258,6 +258,7 @@ router.get('/:id', async (req, res) => {
         res.json({ 
             ...ticket, 
             operator_phone: ticket.operator?.phone,
+            service_fee_percent: ticket.operator?.service_fee_percent ?? 10,
             bookings, 
             bookedSeats, 
             seatGenders, 

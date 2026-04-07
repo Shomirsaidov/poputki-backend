@@ -132,6 +132,19 @@ router.post('/create-invoice', async (req, res) => {
 
         if (ticketError || !ticket) return res.status(404).json({ error: 'Ticket not found' });
 
+        // Fetch operator's service fee percent (defaults to 10 if not set)
+        let feePercent = 10;
+        if (ticket.operator_id) {
+            const { data: operator } = await supabase
+                .from('users')
+                .select('service_fee_percent')
+                .eq('id', ticket.operator_id)
+                .maybeSingle();
+            if (operator && operator.service_fee_percent != null) {
+                feePercent = parseFloat(operator.service_fee_percent);
+            }
+        }
+
         // Check seat availability against actual confirmed bookings only
         const { data: existingBookings } = await supabase
             .from('bus_ticket_bookings')
@@ -181,10 +194,10 @@ router.post('/create-invoice', async (req, res) => {
         if (insertError) throw insertError;
 
         // Create SmartPay invoice
-        // Platform charges only 10% as a booking service fee; the carrier collects the remaining 90% directly.
-        const platformFee = Math.round(totalPrice * 0.1);
+        // Platform charges only feePercent% as a booking service fee; the carrier collects the rest directly.
+        const platformFee = Math.round(totalPrice * feePercent / 100);
         const returnUrl = 'https://poputki-backend.onrender.com/api/payments/webhook';
-        const description = `Сервисный сбор (10%) — Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
+        const description = `Сервисный сбор (${feePercent}%) — Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
 
         // Build customer name from first passenger
         const firstPassenger = passengers_data[0] || {};

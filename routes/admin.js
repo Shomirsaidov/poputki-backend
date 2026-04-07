@@ -218,11 +218,37 @@ router.get('/bus-drivers', async (req, res) => {
     try {
         const { data: drivers, error } = await supabase
             .from('users')
-            .select('id, name, surname, phone, created_at')
+            .select('id, name, surname, phone, created_at, service_fee_percent')
             .eq('role', 'bus_driver')
             .order('created_at', { ascending: false });
         if (error) throw error;
         res.json(drivers);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update service fee percent for a specific bus driver
+router.put('/bus-drivers/:id/fee', async (req, res) => {
+    const { id } = req.params;
+    const { service_fee_percent } = req.body;
+
+    if (service_fee_percent === undefined || service_fee_percent === null) {
+        return res.status(400).json({ error: 'service_fee_percent is required' });
+    }
+    const fee = parseFloat(service_fee_percent);
+    if (isNaN(fee) || fee < 0 || fee > 100) {
+        return res.status(400).json({ error: 'service_fee_percent must be between 0 and 100' });
+    }
+
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ service_fee_percent: fee })
+            .eq('id', id)
+            .eq('role', 'bus_driver');
+        if (error) throw error;
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
