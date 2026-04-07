@@ -140,11 +140,17 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
     const { from, to, date } = req.query;
     try {
+        const now = new Date();
+        const currentDate = now.toISOString().split('T')[0];
+        const currentTime = now.toTimeString().split(' ')[0];
+
         let query = supabase
             .from('bus_tickets')
             .select('*')
             .eq('status', 'active')
-            .order('id', { ascending: false });
+            .or(`departure_date.gt.${currentDate},and(departure_date.eq.${currentDate},departure_time.gte.${currentTime})`)
+            .order('departure_date', { ascending: true })
+            .order('departure_time', { ascending: true });
 
         if (from) query = query.ilike('from_city', `%${from}%`);
         // We will filter 'to' in-memory or via complex query to include intermediate stops

@@ -196,7 +196,7 @@ router.post('/create-invoice', async (req, res) => {
         // Create SmartPay invoice
         // Platform charges only feePercent% as a booking service fee; the carrier collects the rest directly.
         const platformFee = Math.round(totalPrice * feePercent / 100);
-        const returnUrl = 'https://poputki-backend.onrender.com/api/payments/webhook';
+        const returnUrl = `https://poputki.online/payment-result?order_id=${paymentOrderId}`;
         const description = `Сервисный сбор (${feePercent}%) — Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
 
         // Build customer name from first passenger
