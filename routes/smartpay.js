@@ -4,7 +4,7 @@ const supabase = require('../db');
 const { sendPersonalMessage } = require('../utils/telegramBot');
 
 const SMARTPAY_API_KEY = '2334b91a76a8555daf6c2c2090f42cffea999a33927061593a9794e0c404bd31';
-const SMARTPAY_BASE_URL = 'https://sandbox.smartpay.tj/api/merchant';
+const SMARTPAY_BASE_URL = 'https://ecomm.smartpay.tj/api/merchant';
 const FRONTEND_URL = 'https://poputki.online';
 
 /**
