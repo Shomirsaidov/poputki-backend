@@ -181,8 +181,10 @@ router.post('/create-invoice', async (req, res) => {
         if (insertError) throw insertError;
 
         // Create SmartPay invoice
+        // Platform charges only 10% as a booking service fee; the carrier collects the remaining 90% directly.
+        const platformFee = Math.round(totalPrice * 0.1);
         const returnUrl = 'https://poputki-backend.onrender.com/api/payments/webhook';
-        const description = `Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
+        const description = `Сервисный сбор (10%) — Билет ${ticket.from_city} → ${ticket.to_city}, ${seat_numbers.length} мест (${seat_numbers.join(', ')})`;
 
         // Build customer name from first passenger
         const firstPassenger = passengers_data[0] || {};
@@ -195,14 +197,14 @@ router.post('/create-invoice', async (req, res) => {
                 'x-app-token': SMARTPAY_API_KEY
             },
             body: JSON.stringify({
-                amount: totalPrice,
+                amount: platformFee,          // Only the 10% platform fee is charged via SmartPay
                 description,
                 order_id: paymentOrderId,
                 return_url: returnUrl,
                 lifetime: 1800,
                 customer_phone: phone ? phone.replace(/^\+992/, '').replace(/\D/g, '') : undefined,
                 qty: seat_numbers.length,
-                unit_price: ticket.price,
+                unit_price: Math.round(ticket.price * 0.1),  // 10% of unit price
                 name: customerName || undefined
             })
         });
