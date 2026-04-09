@@ -3,7 +3,7 @@ const router = express.Router();
 const supabase = require('../db');
 const { sendPersonalMessage } = require('../utils/telegramBot');
 
-const SMARTPAY_API_KEY = '2334b91a76a8555daf6c2c2090f42cffea999a33927061593a9794e0c404bd31';
+const SMARTPAY_API_KEY = '6837e1373ffaf1064239a2ef87954b3c4247dafa60d2713f726d14e9dd4196d9';
 const SMARTPAY_BASE_URL = 'https://ecomm.smartpay.tj/api/merchant';
 const FRONTEND_URL = 'https://poputki.online';
 
