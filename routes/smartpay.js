@@ -217,7 +217,7 @@ router.post('/create-invoice', async (req, res) => {
                 lifetime: 1800,
                 customer_phone: phone ? phone.replace(/^\+992/, '').replace(/\D/g, '') : undefined,
                 qty: seat_numbers.length,
-                unit_price: Math.round(ticket.price * 0.1),  // 10% of unit price
+                unit_price: Math.round(ticket.price * feePercent / 100),  // Use dynamic fee percentage from DB
                 name: customerName || undefined
             })
         });
