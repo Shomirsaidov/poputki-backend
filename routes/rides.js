@@ -110,6 +110,10 @@ router.get('/check-limit', async (req, res) => {
 router.get('/', async (req, res) => {
     const { from, to, date, all_status } = req.query;
     try {
+        const now = new Date();
+        const currentDate = now.toISOString().split('T')[0];
+        const currentTime = now.toTimeString().split(' ')[0];
+
         let query = supabase
             .from('rides')
             .select(`
@@ -120,8 +124,9 @@ router.get('/', async (req, res) => {
             .order('id', { ascending: false });
 
         if (!all_status) {
-            // Because Supabase considers NULL equal to nothing in .eq(), we use .or()
+            // Only active rides in the future
             query = query.or('status.eq.active,status.is.null');
+            query = query.or(`date.gt.${currentDate},and(date.eq.${currentDate},time.gte.${currentTime})`);
         }
 
         if (from) query = query.ilike('from_city', `%${from}%`);

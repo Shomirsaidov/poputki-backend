@@ -248,6 +248,7 @@ router.get('/:id/bus-bookings', async (req, res) => {
                 )
             `)
             .eq('passenger_id', req.params.id)
+            .eq('status', 'confirmed')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
