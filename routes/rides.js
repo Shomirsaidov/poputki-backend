@@ -706,11 +706,25 @@ router.post('/:id/share', async (req, res) => {
 
         const dateStr = driverRide.date;
         const timeStr = driverRide.time ? driverRide.time.substring(0, 5) : '';
-        const driverName = driverRide.users ? driverRide.users.name : 'Водитель';
-        const driverPhone = driverRide.users ? driverRide.users.phone : '';
+        
+        // Safely extract from either Array or Object depending on Supabase relations
+        const dsUser = Array.isArray(driverRide.users) ? driverRide.users[0] : (driverRide.users || {});
+        let driverName = dsUser.name || 'Водитель';
+
+        // Sanitize any accidental HTML characters from name to prevent Telegram API 400 errors
+        driverName = driverName.replace(/</g, '').replace(/>/g, '').replace(/&/g, 'и');
+
+        // Extract min price if row_prices exists
+        let displayPrice = driverRide.price;
+        if (driverRide.row_prices && Object.keys(driverRide.row_prices).length > 0) {
+            const prices = Object.values(driverRide.row_prices).filter(p => !isNaN(p) && p !== null && p > 0);
+            if (prices.length > 0) {
+                displayPrice = Math.min(...prices, driverRide.price > 0 ? driverRide.price : Infinity);
+            }
+        }
 
         // Add to telegram queue or send right away
-        const msg = `🚗 <b>ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ ПОЕЗДКИ</b>\n\nВодитель <b>${driverName}</b> предлагает вам присоединиться к его поездке:\n📍 <b>Маршрут:</b> ${driverRide.from_city} ➡ ${driverRide.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💵 <b>Цена от:</b> ${driverRide.price} с.\n\n<i>Откройте список поездок, найдите водителя и забронируйте место!</i>`;
+        const msg = `🚗 <b>ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ ПОЕЗДКИ</b>\n\nВодитель <b>${driverName}</b> предлагает вам присоединиться к его поездке:\n📍 <b>Маршрут:</b> ${driverRide.from_city} ➡ ${driverRide.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💵 <b>Цена от:</b> ${displayPrice} с.\n\n<i>Откройте список поездок, найдите водителя и забронируйте место!</i>`;
 
         const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${driver_ride_id}`;
         const options = {
@@ -722,6 +736,7 @@ router.post('/:id/share', async (req, res) => {
         const personalMsgSuccess = await sendPersonalMessage(passengerReq.driver_id, msg, options);
 
         if (!personalMsgSuccess) {
+            console.error(`Failed to send telegram msg in share endpoint for ride: ${driver_ride_id} to passenger: ${passengerReq.driver_id}`);
             return res.status(500).json({ error: 'Не удалось отправить уведомление пассажиру. Возможно, он не запустил бота.' });
         }
 
