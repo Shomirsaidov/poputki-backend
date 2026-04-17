@@ -66,6 +66,17 @@ router.post('/', async (req, res) => {
         floor1_seats, floor2_seats, premium_price, photos
     } = req.body;
     try {
+        // Check if operator is blocked
+        const { data: operator } = await supabase
+            .from('users')
+            .select('is_blocked')
+            .eq('id', operator_id)
+            .single();
+
+        if (operator?.is_blocked) {
+            return res.status(403).json({ error: 'Ваш аккаунт заблокирован. Вы не можете создавать новые рейсы.' });
+        }
+
         let photoResults = [];
         if (photos && Array.isArray(photos)) {
             for (const photo of photos) {

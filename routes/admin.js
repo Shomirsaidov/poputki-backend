@@ -218,7 +218,7 @@ router.get('/bus-drivers', async (req, res) => {
     try {
         const { data: drivers, error } = await supabase
             .from('users')
-            .select('id, name, surname, phone, created_at, service_fee_percent')
+            .select('id, name, surname, phone, created_at, service_fee_percent, is_blocked')
             .eq('role', 'bus_driver')
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -246,6 +246,36 @@ router.put('/bus-drivers/:id/fee', async (req, res) => {
             .from('users')
             .update({ service_fee_percent: fee })
             .eq('id', id)
+            .eq('role', 'bus_driver');
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Block a bus driver
+router.put('/bus-drivers/:id/block', async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ is_blocked: true })
+            .eq('id', req.params.id)
+            .eq('role', 'bus_driver');
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Unblock a bus driver
+router.put('/bus-drivers/:id/unblock', async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ is_blocked: false })
+            .eq('id', req.params.id)
             .eq('role', 'bus_driver');
         if (error) throw error;
         res.json({ success: true });
