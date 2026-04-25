@@ -180,7 +180,7 @@ router.get('/users', async (req, res) => {
     try {
         const { data: users, error } = await supabase
             .from('users')
-            .select('*')
+            .select('id, name, surname, phone, rating, created_at, role, age, sex, photo_url, username, is_blocked')
             .order('created_at', { ascending: false });
         if (error) throw error;
         res.json(users);
