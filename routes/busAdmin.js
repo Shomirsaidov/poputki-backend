@@ -369,4 +369,64 @@ router.put('/bookings/:id', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/bus-admin/bookings/{id}:
+ *   delete:
+ *     summary: Delete a bus booking and release seats
+ *     tags: [Bus Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.delete('/bookings/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // 1. Get the booking to know which seats to release and which ticket it belongs to
+        const { data: booking, error: bErr } = await supabase
+            .from('bus_ticket_bookings')
+            .select('bus_ticket_id, seat_numbers')
+            .eq('id', id)
+            .single();
+
+        if (bErr || !booking) return res.status(404).json({ error: 'Booking not found' });
+
+        const ticketId = booking.bus_ticket_id;
+        const seatsToRelease = typeof booking.seat_numbers === 'string' ? JSON.parse(booking.seat_numbers || '[]') : (booking.seat_numbers || []);
+
+        // 2. Delete the booking
+        const { error: delErr } = await supabase
+            .from('bus_ticket_bookings')
+            .delete()
+            .eq('id', id);
+
+        if (delErr) throw delErr;
+
+        // 3. Release the seats in the bus_tickets table
+        const { data: ticket, error: tErr } = await supabase
+            .from('bus_tickets')
+            .select('reserved_seats')
+            .eq('id', ticketId)
+            .single();
+
+        if (!tErr && ticket) {
+            const reserved = typeof ticket.reserved_seats === 'string' ? JSON.parse(ticket.reserved_seats || '[]') : (ticket.reserved_seats || []);
+            const newReserved = reserved.filter(s => !seatsToRelease.includes(s));
+
+            await supabase
+                .from('bus_tickets')
+                .update({ reserved_seats: newReserved })
+                .eq('id', ticketId);
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
