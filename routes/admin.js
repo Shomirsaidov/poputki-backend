@@ -461,4 +461,83 @@ router.delete('/reviews/:id', async (req, res) => {
     }
 });
 
+// Get all bookings for a specific bus ticket (admin drill-down)
+router.get('/bus-tickets/:id/bookings', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const { data: bookings, error } = await supabase
+            .from('bus_ticket_bookings')
+            .select(`
+                id, bus_ticket_id, passenger_id, seat_numbers, passenger_count, passengers_data, phone, status, total_price, passenger_name, pickup_city, drop_off_city, created_at,
+                users:passenger_id (name, phone)
+            `)
+            .eq('bus_ticket_id', id)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const result = (bookings || []).map(b => ({
+            ...b,
+            passenger_name: b.passenger_name || b.users?.name,
+            passenger_phone: b.users?.phone || b.phone,
+            seat_numbers: typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []),
+            passengers_data: typeof b.passengers_data === 'string' ? JSON.parse(b.passengers_data || '[]') : (b.passengers_data || [])
+        }));
+
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get all bus tickets (rides) for a specific bus driver (admin drill-down)
+router.get('/bus-drivers/:id/tickets', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const { data: tickets, error } = await supabase
+            .from('bus_tickets')
+            .select('*')
+            .eq('operator_id', id)
+            .order('departure_date', { ascending: false });
+
+        if (error) throw error;
+
+        // Fetch confirmed bookings to compute actual reserved seats
+        const ticketIds = (tickets || []).map(t => t.id);
+        const { data: allBookings } = ticketIds.length > 0
+            ? await supabase
+                .from('bus_ticket_bookings')
+                .select('bus_ticket_id, seat_numbers')
+                .in('bus_ticket_id', ticketIds)
+                .eq('status', 'confirmed')
+            : { data: [] };
+
+        const result = (tickets || []).map(t => {
+            const ticketBookings = (allBookings || []).filter(b => b.bus_ticket_id === t.id);
+            const reservedSeats = [];
+            ticketBookings.forEach(b => {
+                const seats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+                reservedSeats.push(...seats);
+            });
+            return {
+                ...t,
+                reserved_seats: reservedSeats,
+                reserved_count: reservedSeats.length,
+                free_seats: t.total_seats - reservedSeats.length,
+                intermediate_stops: typeof t.intermediate_stops === 'string'
+                    ? JSON.parse(t.intermediate_stops || '[]')
+                    : (t.intermediate_stops || []),
+                departure_time: t.departure_time ? t.departure_time.substring(0, 5) : t.departure_time,
+                arrival_time: t.arrival_time ? t.arrival_time.substring(0, 5) : t.arrival_time,
+            };
+        });
+
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
+
