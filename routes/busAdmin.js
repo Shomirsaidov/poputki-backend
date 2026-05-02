@@ -23,6 +23,99 @@ const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinar
  *         schema:
  *           type: integer
  */
+router.get('/stats', async (req, res) => {
+    const { operator_id } = req.query;
+    if (!operator_id) return res.status(400).json({ error: 'operator_id required' });
+
+    try {
+        // 1. Basic counts
+        const { count: totalRides } = await supabase.from('bus_tickets').select('*', { count: 'exact', head: true }).eq('operator_id', operator_id);
+        const { count: activeRides } = await supabase.from('bus_tickets').select('*', { count: 'exact', head: true }).eq('operator_id', operator_id).eq('status', 'active');
+        
+        // 2. Bookings and Revenue
+        const { data: tickets } = await supabase.from('bus_tickets').select('id, total_seats').eq('operator_id', operator_id);
+        const ticketIds = (tickets || []).map(t => t.id);
+
+        if (ticketIds.length === 0) {
+            return res.json({
+                totalRides: 0,
+                activeRides: 0,
+                totalBookings: 0,
+                totalRevenue: 0,
+                avgFillRate: 0,
+                dailyBookings: [],
+                popularRoutes: []
+            });
+        }
+
+        const { data: bookings } = await supabase
+            .from('bus_ticket_bookings')
+            .select('id, total_price, passenger_count, created_at, bus_ticket_id')
+            .in('bus_ticket_id', ticketIds)
+            .eq('status', 'confirmed');
+
+        const totalBookings = (bookings || []).length;
+        const totalRevenue = (bookings || []).reduce((acc, curr) => acc + (curr.total_price || 0), 0);
+
+        // 3. Average Fill Rate
+        // For each ticket, calculate filled seats / total seats
+        const { data: allReserved } = await supabase
+            .from('bus_ticket_bookings')
+            .select('bus_ticket_id, passenger_count')
+            .in('bus_ticket_id', ticketIds)
+            .eq('status', 'confirmed');
+
+        const fillRates = tickets.map(t => {
+            const reserved = (allReserved || []).filter(b => b.bus_ticket_id === t.id).reduce((acc, curr) => acc + curr.passenger_count, 0);
+            return (reserved / t.total_seats) * 100;
+        });
+        const avgFillRate = fillRates.length > 0 ? (fillRates.reduce((a, b) => a + b, 0) / fillRates.length).toFixed(1) : 0;
+
+        // 4. Daily Bookings (Last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const dateString = thirtyDaysAgo.toISOString().split('T')[0];
+
+        const dailyMap = (bookings || []).filter(b => b.created_at >= dateString).reduce((acc, curr) => {
+            const date = curr.created_at.split('T')[0];
+            acc[date] = (acc[date] || 0) + 1;
+            return acc;
+        }, {});
+
+        const dailyBookings = Object.keys(dailyMap)
+            .map(date => ({ date, count: dailyMap[date] }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        // 5. Popular Routes
+        const { data: routeInfo } = await supabase.from('bus_tickets').select('from_city, to_city').eq('operator_id', operator_id);
+        const routeCounts = (routeInfo || []).reduce((acc, curr) => {
+            const route = `${curr.from_city} → ${curr.to_city}`;
+            acc[route] = (acc[route] || 0) + 1;
+            return acc;
+        }, {});
+        const popularRoutes = Object.keys(routeCounts)
+            .map(route => ({ route, count: routeCounts[route] }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        res.json({
+            totalRides,
+            activeRides,
+            totalBookings,
+            totalRevenue,
+            avgFillRate,
+            dailyBookings,
+            popularRoutes
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+
 router.get('/tickets', async (req, res) => {
     const { operator_id } = req.query;
     if (!operator_id) return res.status(400).json({ error: 'operator_id required' });

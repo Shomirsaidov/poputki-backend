@@ -45,10 +45,12 @@ router.get('/stats', async (req, res) => {
         const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
         const { count: totalRides } = await supabase.from('rides').select('*', { count: 'exact', head: true });
         const { count: activeRides } = await supabase.from('rides').select('*', { count: 'exact', head: true }).eq('status', 'active');
+        const { count: totalBusTickets } = await supabase.from('bus_tickets').select('*', { count: 'exact', head: true });
+        const { count: activeBusTickets } = await supabase.from('bus_tickets').select('*', { count: 'exact', head: true }).eq('status', 'active');
         const { count: totalBusBookings } = await supabase.from('bus_ticket_bookings').select('*', { count: 'exact', head: true });
         const { count: totalReviews } = await supabase.from('reviews').select('*', { count: 'exact', head: true });
 
-        const { data: busBookingsRevenue } = await supabase.from('bus_ticket_bookings').select('total_price');
+        const { data: busBookingsRevenue } = await supabase.from('bus_ticket_bookings').select('total_price').eq('status', 'confirmed');
         const revenue = (busBookingsRevenue || []).reduce((acc, curr) => acc + (curr.total_price || 0), 0);
 
         // Detailed stats
@@ -71,6 +73,18 @@ router.get('/stats', async (req, res) => {
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
 
+        // popularBusRoutes
+        const { data: allBusTickets } = await supabase.from('bus_tickets').select('from_city, to_city');
+        const busRouteCounts = (allBusTickets || []).reduce((acc, curr) => {
+            const route = `${curr.from_city} → ${curr.to_city}`;
+            acc[route] = (acc[route] || 0) + 1;
+            return acc;
+        }, {});
+        const popularBusRoutes = Object.keys(busRouteCounts)
+            .map(route => ({ route, count: busRouteCounts[route] }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
         // Stats for Charts
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -89,6 +103,21 @@ router.get('/stats', async (req, res) => {
         }, {});
         const ridesLast7Days = Object.keys(ridesLast7DaysMap)
             .map(date => ({ date, count: ridesLast7DaysMap[date] }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        const { data: busTicketsLast7DaysRaw } = await supabase
+            .from('bus_tickets')
+            .select('departure_date')
+            .gte('departure_date', dateString);
+
+        const busTicketsLast7DaysMap = (busTicketsLast7DaysRaw || []).reduce((acc, curr) => {
+            if (curr.departure_date) {
+                acc[curr.departure_date] = (acc[curr.departure_date] || 0) + 1;
+            }
+            return acc;
+        }, {});
+        const busTicketsLast7Days = Object.keys(busTicketsLast7DaysMap)
+            .map(date => ({ date, count: busTicketsLast7DaysMap[date] }))
             .sort((a, b) => a.date.localeCompare(b.date));
 
         const { data: usersLast7DaysRaw } = await supabase
@@ -157,12 +186,16 @@ router.get('/stats', async (req, res) => {
             totalUsers,
             totalRides,
             activeRides,
+            totalBusTickets,
+            activeBusTickets,
             totalBusBookings,
             totalReviews,
             revenue,
             recentUsers,
             popularDestinations,
+            popularBusRoutes,
             ridesLast7Days,
+            busTicketsLast7Days,
             usersLast7Days,
             vehicleDistribution,
             ageDistribution,
