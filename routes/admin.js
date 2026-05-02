@@ -136,28 +136,20 @@ router.get('/stats', async (req, res) => {
             .map(register_date => ({ register_date, count: usersLast7DaysMap[register_date] }))
             .sort((a, b) => a.register_date.localeCompare(b.register_date));
 
-        // Global Booking Dynamics (Last 30 days)
+        // Global Booking Dynamics (Bus only, last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const thirtyDateString = thirtyDaysAgo.toISOString().split('T')[0];
 
-        const { data: carBookings } = await supabase.from('bookings').select('id, ride_id').gte('ride_id', 0); // Simplified check
-        // Actually rides have dates, but bookings might not have a created_at in some schemas. 
-        // Let's check bus_ticket_bookings first as they have created_at.
-        const { data: busBookings } = await supabase.from('bus_ticket_bookings').select('created_at').gte('created_at', thirtyDateString);
+        const { data: busBookings } = await supabase
+            .from('bus_ticket_bookings')
+            .select('created_at')
+            .gte('created_at', thirtyDateString);
         
-        // Let's assume car bookings are linked to rides which have dates. 
-        // But for "dynamics" we usually want when the booking was made.
-        // If 'bookings' table doesn't have created_at, I'll use ride dates for car rides.
-        const { data: carRides } = await supabase.from('rides').select('date').gte('date', thirtyDateString);
-
         const bookingMap = {};
         (busBookings || []).forEach(b => {
             const d = b.created_at.split('T')[0];
             bookingMap[d] = (bookingMap[d] || 0) + 1;
-        });
-        (carRides || []).forEach(r => {
-            bookingMap[r.date] = (bookingMap[r.date] || 0) + 1;
         });
 
         const bookingDynamics = Object.keys(bookingMap)
