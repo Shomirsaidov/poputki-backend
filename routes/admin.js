@@ -155,11 +155,11 @@ router.get('/stats', async (req, res) => {
             const d = b.created_at.split('T')[0];
             bookingMap[d] = (bookingMap[d] || 0) + 1;
             
-            if (b.status === 'confirmed') {
+            if (b.status !== 'cancelled') {
                 totalCount++;
                 if (b.total_price === 0) {
                     manualCount++;
-                } else {
+                } else if (b.status === 'confirmed') {
                     paidCount++;
                 }
             }
