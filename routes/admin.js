@@ -143,37 +143,38 @@ router.get('/stats', async (req, res) => {
 
         const { data: busBookings } = await supabase
             .from('bus_ticket_bookings')
-            .select('created_at')
+            .select('created_at, status, total_price')
             .gte('created_at', thirtyDateString);
         
         const bookingMap = {};
+        let paidCount = 0;
+        let manualCount = 0;
+        let totalCount = 0;
+
         (busBookings || []).forEach(b => {
             const d = b.created_at.split('T')[0];
             bookingMap[d] = (bookingMap[d] || 0) + 1;
+            
+            if (b.status !== 'cancelled') {
+                totalCount++;
+                if (b.total_price === 0) {
+                    manualCount++;
+                } else if (b.status === 'confirmed') {
+                    paidCount++;
+                }
+            }
         });
 
         const bookingDynamics = Object.keys(bookingMap)
             .map(date => ({ date, count: bookingMap[date] }))
             .sort((a, b) => a.date.localeCompare(b.date));
 
-        // Vehicle Distribution
-        const { data: userVehicles } = await supabase
-            .from('users')
-            .select('id, vehicles(id)');
-
-        let withVehicle = 0;
-        let noVehicle = 0;
-        (userVehicles || []).forEach(u => {
-            if (u.vehicles && u.vehicles.length > 0) {
-                withVehicle++;
-            } else {
-                noVehicle++;
-            }
-        });
-        const vehicleDistribution = [
-            { status: 'with_vehicle', count: withVehicle },
-            { status: 'no_vehicle', count: noVehicle }
-        ];
+        const bookingStatusDistribution = {
+            total: totalCount,
+            paid: paidCount,
+            manual: manualCount,
+            other: totalCount - paidCount - manualCount
+        };
 
         // Age Distribution
         const { data: userAges } = await supabase.from('users').select('age');
@@ -218,7 +219,7 @@ router.get('/stats', async (req, res) => {
             busTicketsLast7Days,
             usersLast7Days,
             bookingDynamics,
-            vehicleDistribution,
+            bookingStatusDistribution,
             ageDistribution,
             carModelDistribution
         };
