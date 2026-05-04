@@ -238,7 +238,7 @@ router.get('/bookings', async (req, res) => {
                 users:passenger_id (name, phone)
             `)
             .in('bus_ticket_id', ticketIds)
-            .neq('status', 'cancelled')
+            .eq('status', 'confirmed')
             .order('created_at', { ascending: false });
 
         if (bErr) {

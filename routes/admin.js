@@ -47,7 +47,7 @@ router.get('/stats', async (req, res) => {
         const { count: activeRides } = await supabase.from('rides').select('*', { count: 'exact', head: true }).eq('status', 'active');
         const { count: totalBusTickets } = await supabase.from('bus_tickets').select('*', { count: 'exact', head: true });
         const { count: activeBusTickets } = await supabase.from('bus_tickets').select('*', { count: 'exact', head: true }).eq('status', 'active');
-        const { count: totalBusBookings } = await supabase.from('bus_ticket_bookings').select('*', { count: 'exact', head: true });
+        const { count: totalBusBookings } = await supabase.from('bus_ticket_bookings').select('*', { count: 'exact', head: true }).eq('status', 'confirmed');
         const { count: totalReviews } = await supabase.from('reviews').select('*', { count: 'exact', head: true });
 
         const { data: busBookingsRevenue } = await supabase.from('bus_ticket_bookings').select('total_price').eq('status', 'confirmed');
@@ -155,11 +155,11 @@ router.get('/stats', async (req, res) => {
             const d = b.created_at.split('T')[0];
             bookingMap[d] = (bookingMap[d] || 0) + 1;
             
-            if (b.status !== 'cancelled') {
+            if (b.status === 'confirmed') {
                 totalCount++;
                 if (b.total_price === 0) {
                     manualCount++;
-                } else if (b.status === 'confirmed') {
+                } else {
                     paidCount++;
                 }
             }
@@ -583,13 +583,12 @@ router.get('/bus-drivers/:id/tickets', async (req, res) => {
                 // We only count confirmed as reserved for the "free seats" calculation
                 if (b.status === 'confirmed') {
                     reservedSeats.push(...(Array.isArray(seats) ? seats : [seats]));
-                }
-
-                totalBooked += count;
-                if (b.total_price === 0) {
-                    manualBooked += count;
-                } else if (b.status === 'confirmed') {
-                    paidBooked += count;
+                    totalBooked += count;
+                    if (b.total_price === 0) {
+                        manualBooked += count;
+                    } else {
+                        paidBooked += count;
+                    }
                 } else if (b.status === 'pending_payment') {
                     pendingBooked += count;
                 }
