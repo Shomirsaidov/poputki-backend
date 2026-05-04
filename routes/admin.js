@@ -573,6 +573,7 @@ router.get('/bus-drivers/:id/tickets', async (req, res) => {
             const reservedSeats = [];
             let manualBooked = 0;
             let paidBooked = 0;
+            let pendingBooked = 0;
             let totalBooked = 0;
 
             ticketBookings.forEach(b => {
@@ -589,6 +590,8 @@ router.get('/bus-drivers/:id/tickets', async (req, res) => {
                     manualBooked += count;
                 } else if (b.status === 'confirmed') {
                     paidBooked += count;
+                } else if (b.status === 'pending_payment') {
+                    pendingBooked += count;
                 }
             });
 
@@ -599,6 +602,7 @@ router.get('/bus-drivers/:id/tickets', async (req, res) => {
                 total_booked: totalBooked,
                 manual_booked: manualBooked,
                 paid_booked: paidBooked,
+                pending_booked: pendingBooked,
                 free_seats: t.total_seats - reservedSeats.length,
                 intermediate_stops: typeof t.intermediate_stops === 'string'
                     ? JSON.parse(t.intermediate_stops || '[]')
