@@ -558,27 +558,47 @@ router.get('/bus-drivers/:id/tickets', async (req, res) => {
 
         if (error) throw error;
 
-        // Fetch confirmed bookings to compute actual reserved seats
+        // Fetch non-cancelled bookings to compute actual reserved seats and statistics
         const ticketIds = (tickets || []).map(t => t.id);
         const { data: allBookings } = ticketIds.length > 0
             ? await supabase
                 .from('bus_ticket_bookings')
-                .select('bus_ticket_id, seat_numbers')
+                .select('bus_ticket_id, seat_numbers, status, total_price')
                 .in('bus_ticket_id', ticketIds)
-                .eq('status', 'confirmed')
+                .neq('status', 'cancelled')
             : { data: [] };
 
         const result = (tickets || []).map(t => {
             const ticketBookings = (allBookings || []).filter(b => b.bus_ticket_id === t.id);
             const reservedSeats = [];
+            let manualBooked = 0;
+            let paidBooked = 0;
+            let totalBooked = 0;
+
             ticketBookings.forEach(b => {
                 const seats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
-                reservedSeats.push(...seats);
+                const count = Array.isArray(seats) ? seats.length : (seats ? 1 : 0);
+                
+                // We only count confirmed as reserved for the "free seats" calculation
+                if (b.status === 'confirmed') {
+                    reservedSeats.push(...(Array.isArray(seats) ? seats : [seats]));
+                }
+
+                totalBooked += count;
+                if (b.total_price === 0) {
+                    manualBooked += count;
+                } else if (b.status === 'confirmed') {
+                    paidBooked += count;
+                }
             });
+
             return {
                 ...t,
                 reserved_seats: reservedSeats,
                 reserved_count: reservedSeats.length,
+                total_booked: totalBooked,
+                manual_booked: manualBooked,
+                paid_booked: paidBooked,
                 free_seats: t.total_seats - reservedSeats.length,
                 intermediate_stops: typeof t.intermediate_stops === 'string'
                     ? JSON.parse(t.intermediate_stops || '[]')
