@@ -115,7 +115,11 @@ router.get('/stats', async (req, res) => {
 
 /**
  * @swagger
-
+ * /api/bus-admin/tickets:
+ *   get:
+ *     summary: Get tickets created by the bus operator
+ *     tags: [Bus Admin]
+ */
 router.get('/tickets', async (req, res) => {
     const { operator_id } = req.query;
     if (!operator_id) return res.status(400).json({ error: 'operator_id required' });
