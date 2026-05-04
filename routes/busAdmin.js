@@ -121,33 +121,57 @@ router.get('/tickets', async (req, res) => {
     if (!operator_id) return res.status(400).json({ error: 'operator_id required' });
 
     try {
+        console.log(`[BusAdmin] Fetching tickets for operator: ${operator_id}`);
         const { data: tickets, error } = await supabase
             .from('bus_tickets')
             .select('*')
             .eq('operator_id', operator_id)
             .order('departure_date', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('[BusAdmin] Supabase error fetching tickets:', error);
+            throw error;
+        }
+
+        if (!tickets || tickets.length === 0) {
+            console.log(`[BusAdmin] No tickets found for operator: ${operator_id}`);
+            return res.json([]);
+        }
 
         // Fetch all relevant bookings to calculate accurate reserved seats (including pending_payment)
         const ticketIds = tickets.map(t => t.id);
-        const { data: allBookings } = await supabase
+        const { data: allBookings, error: bErr } = await supabase
             .from('bus_ticket_bookings')
-            .select('bus_ticket_id, seat_numbers')
+            .select('bus_ticket_id, seat_numbers, status')
             .in('bus_ticket_id', ticketIds)
-            .in('status', ['confirmed']);
+            .neq('status', 'cancelled');
+
+        if (bErr) {
+            console.error('[BusAdmin] Error fetching bookings for tickets:', bErr);
+        }
 
         const result = tickets.map(t => {
+            // We count both 'confirmed' and 'pending_payment' as reserved to prevent double booking
             const ticketBookings = (allBookings || []).filter(b => b.bus_ticket_id === t.id);
             const actuallyReserved = [];
+            
             ticketBookings.forEach(b => {
-                const seats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
-                actuallyReserved.push(...seats);
+                try {
+                    const seats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+                    if (Array.isArray(seats)) {
+                        actuallyReserved.push(...seats);
+                    } else if (seats) {
+                        actuallyReserved.push(seats);
+                    }
+                } catch (e) {
+                    console.error(`[BusAdmin] Error parsing seat_numbers for booking ${b.id}:`, e);
+                }
             });
 
+            // Clean formatting for frontend
             return {
                 ...t,
-                reserved_seats: actuallyReserved,
+                reserved_seats: [...new Set(actuallyReserved)], // Unique seats
                 intermediate_stops: (typeof t.intermediate_stops === 'string' ? JSON.parse(t.intermediate_stops || '[]') : (t.intermediate_stops || [])).map(s => ({
                     ...s,
                     time: s.time ? s.time.substring(0, 5) : s.time
@@ -157,8 +181,10 @@ router.get('/tickets', async (req, res) => {
             };
         });
 
+        console.log(`[BusAdmin] Successfully returning ${result.length} tickets for operator ${operator_id}`);
         res.json(result);
     } catch (err) {
+        console.error('[BusAdmin] Critical error in /tickets:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -181,16 +207,24 @@ router.get('/bookings', async (req, res) => {
     if (!operator_id) return res.status(400).json({ error: 'operator_id required' });
 
     try {
+        console.log(`[BusAdmin] Fetching bookings for operator: ${operator_id}`);
         // Find tickets for this operator
         const { data: tickets, error: tErr } = await supabase
             .from('bus_tickets')
             .select('id, from_city, to_city, departure_date, departure_time')
             .eq('operator_id', operator_id);
 
-        if (tErr) throw tErr;
-        const ticketIds = tickets.map(t => t.id);
+        if (tErr) {
+            console.error('[BusAdmin] Error fetching operator tickets for bookings:', tErr);
+            throw tErr;
+        }
+        
+        if (!tickets || tickets.length === 0) {
+            console.log(`[BusAdmin] No tickets found, so no bookings to return for operator ${operator_id}`);
+            return res.json([]);
+        }
 
-        if (ticketIds.length === 0) return res.json([]);
+        const ticketIds = tickets.map(t => t.id);
 
         // Get bookings for these tickets
         const { data: bookings, error: bErr } = await supabase
@@ -203,22 +237,39 @@ router.get('/bookings', async (req, res) => {
             .neq('status', 'cancelled')
             .order('created_at', { ascending: false });
 
-        if (bErr) throw bErr;
+        if (bErr) {
+            console.error('[BusAdmin] Error fetching bookings:', bErr);
+            throw bErr;
+        }
 
-        const result = bookings.map(b => {
+        const result = (bookings || []).map(b => {
             const ticket = tickets.find(t => t.id === b.bus_ticket_id);
+            let parsedSeats = [];
+            let parsedPData = [];
+
+            try {
+                parsedSeats = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+                if (!Array.isArray(parsedSeats)) parsedSeats = parsedSeats ? [parsedSeats] : [];
+            } catch (e) { console.error(`Error parsing seat_numbers for booking ${b.id}`, e); }
+
+            try {
+                parsedPData = typeof b.passengers_data === 'string' ? JSON.parse(b.passengers_data || '[]') : (b.passengers_data || []);
+            } catch (e) { console.error(`Error parsing passengers_data for booking ${b.id}`, e); }
+
             return {
                 ...b,
-                passenger_name: b.passenger_name || b.users?.name,
-                passenger_phone: b.users?.phone || b.phone,
-                seat_numbers: typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : b.seat_numbers,
-                passengers_data: typeof b.passengers_data === 'string' ? JSON.parse(b.passengers_data || '[]') : b.passengers_data,
+                passenger_name: b.passenger_name || b.users?.name || '—',
+                passenger_phone: b.users?.phone || b.phone || '—',
+                seat_numbers: parsedSeats,
+                passengers_data: parsedPData,
                 ticket_context: ticket ? `${ticket.from_city} -> ${ticket.to_city} (${ticket.departure_date})` : 'Unknown'
             };
-        })
+        });
 
+        console.log(`[BusAdmin] Successfully returning ${result.length} bookings for operator ${operator_id}`);
         res.json(result);
     } catch (err) {
+        console.error('[BusAdmin] Critical error in /bookings:', err);
         res.status(500).json({ error: err.message });
     }
 });
