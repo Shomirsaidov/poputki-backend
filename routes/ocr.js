@@ -32,41 +32,69 @@ router.post('/passport', async (req, res) => {
     }
 
     try {
+        // 1. Strip the Data URI prefix to get raw base64
+        // Input: "data:image/jpeg;base64,/9j/4AAQ..."  →  Output: "/9j/4AAQ..."
+        const base64Data = image.includes(',') ? image.split(',')[1] : image;
+
+        // 2. Upload to Cloudinary for storage
         console.log('[OCR] Uploading passport image to Cloudinary...');
-        // 1. Upload to Cloudinary
         const cloudinaryResult = await uploadToCloudinary(image, {
             folder: 'poputki/passports',
             tags: ['passport', 'ocr']
         });
-
         console.log('[OCR] Image uploaded to Cloudinary:', cloudinaryResult.url);
 
-        // 2. Call 100OCRAPI
+        // 3. Call 100OCRAPI with raw base64 (form-urlencoded)
         console.log('[OCR] Calling 100OCRAPI...');
-        const ocrResponse = await axios.post(OCR_API_URL, {
-            image: cloudinaryResult.url
-        }, {
-            headers: {
-                'apikey': OCR_API_KEY,
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        const ocrResponse = await axios.post(OCR_API_URL,
+            `img=${encodeURIComponent(base64Data)}`,
+            {
+                headers: {
+                    'X-API-Key': OCR_API_KEY,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
             }
-        });
+        );
 
         const data = ocrResponse.data;
         console.log('[OCR] 100OCRAPI raw response:', JSON.stringify(data));
 
-        // 3. Map to our passenger format
-        // Typical 100OCRAPI response fields: first_name, last_name, date_of_birth, passport_number, sex, nationality
-        // Mapping may need adjustment based on actual API response structure
+        // 4. Check for API errors
+        if (data.status !== 'OK') {
+            console.error('[OCR] API returned error status:', data.status, data.message);
+            return res.status(400).json({
+                error: 'OCR recognition failed',
+                details: data.message || data.status
+            });
+        }
+
+        // 5. Map response to our passenger format
+        // API response: { status: "OK", message: { passportNumber, name, gender, birthDay, nationality, ... } }
+        const msg = data.message;
+
+        // Parse full name — API returns "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME"
+        let lastName = '';
+        let firstName = '';
+        if (msg.name) {
+            const nameParts = msg.name.replace(',', '').trim().split(/\s+/);
+            lastName = nameParts[0] || '';
+            firstName = nameParts.slice(1).join(' ') || '';
+        }
+
+        // Parse birthDay from "YYYYMMDD" → "YYYY-MM-DD"
+        let birthDate = '';
+        if (msg.birthDay && msg.birthDay.length === 8) {
+            birthDate = `${msg.birthDay.slice(0, 4)}-${msg.birthDay.slice(4, 6)}-${msg.birthDay.slice(6, 8)}`;
+        }
+
         const result = {
-            firstName: data.first_name || '',
-            lastName: data.last_name || '',
-            middleName: data.middle_name || '',
-            birthDate: data.date_of_birth ? data.date_of_birth.replace(/\//g, '-') : '', // Convert YYYY/MM/DD to YYYY-MM-DD
-            docNumber: data.passport_number || '',
-            gender: data.sex === 'M' || data.sex === 'male' ? 'male' : (data.sex === 'F' || data.sex === 'female' ? 'female' : ''),
-            citizenship: data.nationality || 'Таджикистан'
+            firstName,
+            lastName,
+            middleName: '',
+            birthDate,
+            docNumber: msg.passportNumber || '',
+            gender: msg.gender === 'M' ? 'male' : (msg.gender === 'F' ? 'female' : ''),
+            citizenship: msg.nationality || 'Таджикистан'
         };
 
         res.json(result);
