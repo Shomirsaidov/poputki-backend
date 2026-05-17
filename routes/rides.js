@@ -140,11 +140,29 @@ router.get('/', async (req, res) => {
         const formattedRides = rides.map(r => {
             const userData = Array.isArray(r.users) ? r.users[0] : (r.users || {});
             delete r.users;
+
+            let driverPhone = userData.phone;
+            let driverName = userData.name;
+
+            if (r.scraper_metadata) {
+                try {
+                    const meta = typeof r.scraper_metadata === 'string' ? JSON.parse(r.scraper_metadata) : r.scraper_metadata;
+                    if (meta && meta.phone) {
+                        driverPhone = meta.phone;
+                    }
+                    if (meta && meta.first_name) {
+                        driverName = meta.first_name + (meta.last_name ? ' ' + meta.last_name : '');
+                    }
+                } catch (err) {
+                    console.error('Error parsing scraper_metadata on search list endpoint:', err);
+                }
+            }
+
             return {
                 ...r,
-                driver_name: userData.name,
-                driver_rating: userData.rating,
-                driver_phone: userData.phone,
+                driver_name: driverName,
+                driver_rating: r.driver_id === 694 ? 5.0 : userData.rating,
+                driver_phone: driverPhone,
                 time: r.time ? r.time.substring(0, 5) : r.time,
                 booked_seats: r.bookings ? r.bookings.length : 0
             };
@@ -221,11 +239,29 @@ router.get('/my', async (req, res) => {
         // Format response
         const formattedRides = uniqueRides.map(r => {
             const userData = Array.isArray(r.users) ? r.users[0] : (r.users || {});
+            
+            let driverPhone = userData.phone;
+            let driverName = userData.name;
+
+            if (r.scraper_metadata) {
+                try {
+                    const meta = typeof r.scraper_metadata === 'string' ? JSON.parse(r.scraper_metadata) : r.scraper_metadata;
+                    if (meta && meta.phone) {
+                        driverPhone = meta.phone;
+                    }
+                    if (meta && meta.first_name) {
+                        driverName = meta.first_name + (meta.last_name ? ' ' + meta.last_name : '');
+                    }
+                } catch (err) {
+                    console.error('Error parsing scraper_metadata on my rides endpoint:', err);
+                }
+            }
+
             return {
                 ...r,
-                driver_name: userData.name,
-                driver_rating: userData.rating,
-                driver_phone: userData.phone,
+                driver_name: driverName,
+                driver_rating: r.driver_id === 694 ? 5.0 : userData.rating,
+                driver_phone: driverPhone,
                 time: r.time ? r.time.substring(0, 5) : r.time,
                 booked_seats: r.bookings ? r.bookings.length : 0
             };
@@ -273,11 +309,28 @@ router.get('/:id', async (req, res) => {
         const userData = Array.isArray(rideRaw.users) ? rideRaw.users[0] : (rideRaw.users || {});
         delete rideRaw.users;
 
+        let driverPhone = userData.phone;
+        let driverName = userData.name;
+
+        if (rideRaw.scraper_metadata) {
+            try {
+                const meta = typeof rideRaw.scraper_metadata === 'string' ? JSON.parse(rideRaw.scraper_metadata) : rideRaw.scraper_metadata;
+                if (meta && meta.phone) {
+                    driverPhone = meta.phone;
+                }
+                if (meta && meta.first_name) {
+                    driverName = meta.first_name + (meta.last_name ? ' ' + meta.last_name : '');
+                }
+            } catch (err) {
+                console.error('Error parsing scraper_metadata on details endpoint:', err);
+            }
+        }
+
         const ride = {
             ...rideRaw,
-            driver_name: userData.name,
-            driver_rating: userData.rating,
-            driver_phone: userData.phone,
+            driver_name: driverName,
+            driver_rating: rideRaw.driver_id === 694 ? 5.0 : userData.rating,
+            driver_phone: driverPhone,
             driver_preferences: typeof userData.preferences === 'string' ? JSON.parse(userData.preferences || '[]') : (userData.preferences || []),
             time: rideRaw.time ? rideRaw.time.substring(0, 5) : rideRaw.time
         };
