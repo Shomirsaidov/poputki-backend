@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../db');
-const { sendPersonalMessage } = require('../utils/telegramBot');
+const { sendPersonalMessage, sendMessage } = require('../utils/telegramBot');
 
 /**
  * @swagger
@@ -87,7 +87,7 @@ router.post('/', async (req, res) => {
         try {
             const { data: rideData } = await supabase
                 .from('rides')
-                .select('driver_id, from_city, to_city, date, time')
+                .select('driver_id, from_city, to_city, date, time, scraper_metadata')
                 .eq('id', ride_id)
                 .single();
 
@@ -125,6 +125,38 @@ router.post('/', async (req, res) => {
                     }
                 };
                 sendPersonalMessage(rideData.driver_id, driverMsg, optionsDriver);
+
+                // Notify original Telegram Group if it's an AI-scraped ride
+                if (rideData.scraper_metadata) {
+                    try {
+                        const meta = typeof rideData.scraper_metadata === 'string' ? JSON.parse(rideData.scraper_metadata) : rideData.scraper_metadata;
+                        if (meta && meta.chat_id) {
+                            let driverReference = '';
+                            if (meta.username) {
+                                driverReference = `@${meta.username}`;
+                            } else if (meta.user_id && meta.first_name) {
+                                driverReference = `<a href="tg://user?id=${meta.user_id}">${meta.first_name}</a>`;
+                            } else if (meta.first_name) {
+                                driverReference = meta.first_name;
+                            } else {
+                                driverReference = 'Ронанда';
+                            }
+
+                            const passengerPhone = userData.phone || 'номълум';
+                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Хизматрасонии poputki.online барои Шумо мусофир ёфт. Лутфан, бо мусофир тавассути ин рақам тамос гиред: <b>${passengerPhone}</b>`;
+                            
+                            const groupOptions = {};
+                            if (meta.message_id) {
+                                groupOptions.reply_to_message_id = meta.message_id;
+                            }
+
+                            console.log(`[Scraper Notification] Sending booking notification to group ${meta.chat_id}, replying to msg ${meta.message_id}`);
+                            await sendMessage(meta.chat_id, groupMsg, groupOptions);
+                        }
+                    } catch (metaErr) {
+                        console.error('Error parsing scraper_metadata or sending group notification:', metaErr);
+                    }
+                }
             }
         } catch (e) {
             console.error('Telegram Bookings Error:', e);

@@ -351,7 +351,7 @@ router.get('/:id', async (req, res) => {
  *         description: Bad request
  */
 router.post('/', async (req, res) => {
-    const { driver_id, from_city, to_city, date, time, price, seats, description, is_passenger_entry, reserved_seats, allows_delivery, from_address, to_address, total_seats, row_prices } = req.body;
+    const { driver_id, from_city, to_city, date, time, price, seats, description, is_passenger_entry, reserved_seats, allows_delivery, from_address, to_address, total_seats, row_prices, scraper_metadata } = req.body;
     console.log(`[Ride Creation] Attempting to create ride for driver_id: ${driver_id}`);
 
     try {
@@ -426,7 +426,8 @@ router.post('/', async (req, res) => {
                 from_address,
                 to_address,
                 total_seats: total_seats || 5,
-                row_prices: row_prices || {}
+                row_prices: row_prices || {},
+                scraper_metadata: scraper_metadata || null
             }])
             .select('id')
             .single();
