@@ -358,7 +358,7 @@ router.post('/', async (req, res) => {
         // Verify user exists to avoid foreign key violation (common after DB reset)
         const { data: userExists, error: userError } = await supabase
             .from('users')
-            .select('id')
+            .select('id, name')
             .eq('id', driver_id)
             .maybeSingle();
 
@@ -366,6 +366,8 @@ router.post('/', async (req, res) => {
             console.error(`[Ride Creation] Driver ${driver_id} not found in database.`);
             return res.status(401).json({ error: 'Приложение работает правильно в телеграм боте' });
         }
+
+        const isAiScraper = userExists && userExists.name === 'AI_scraper';
 
         const { data: activeRides } = await supabase
             .from('rides')
@@ -382,7 +384,7 @@ router.post('/', async (req, res) => {
 
         console.log(`[Ride Creation] driver_id: ${driver_id}, is_passenger_entry: ${is_passenger_entry}, futureActiveRides: ${futureActiveRides.length}`);
 
-        if (futureActiveRides.length >= 2 && !is_passenger_entry) {
+        if (futureActiveRides.length >= 2 && !is_passenger_entry && !isAiScraper) {
             return res.status(400).json({ error: 'У вас уже есть 2 активных рейса в будущем. Завершите их, чтобы создать новый.' });
         }
 
