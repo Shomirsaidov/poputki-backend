@@ -74,7 +74,7 @@ function verifyTelegramData(initData) {
  *         description: Phone missing
  */
 router.post('/login', async (req, res) => {
-    let { phone } = req.body;
+    let { phone, password } = req.body;
     if (!phone) return res.status(400).json({ error: 'Phone required' });
 
     // Normalize phone (digits only + optional start plus)
@@ -85,26 +85,148 @@ router.post('/login', async (req, res) => {
             .from('users')
             .select('*')
             .eq('phone', phone)
-            .single();
+            .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "Results contain 0 rows"
-            throw error;
+        if (error) throw error;
+
+        // Case 1: User does not exist at all
+        if (!user) {
+            return res.json({ 
+                exists: false, 
+                hasPassword: false,
+                message: 'Пользователь не найден. Пожалуйста, зарегистрируйтесь.' 
+            });
         }
 
-        if (!user) {
-            // Create skeleton user
+        // Case 2: User exists but has no password set (e.g. TG bot passenger/skeleton)
+        if (!user.password) {
+            return res.json({ 
+                exists: true, 
+                hasPassword: false, 
+                user: {
+                    id: user.id,
+                    phone: user.phone,
+                    name: user.name,
+                    age: user.age
+                },
+                message: 'Пользователь существует, но пароль не установлен.'
+            });
+        }
+
+        // Case 3: User exists and has a password
+        if (password !== undefined) {
+            // Authenticate
+            if (user.password !== password) {
+                return res.status(401).json({ error: 'Неверный пароль. Пожалуйста, попробуйте снова.' });
+            }
+            // Password matches! Return user session
+            user.isNew = !user.phone || !user.age || !user.name || user.age <= 0;
+            return res.json({ user, token: 'mock-token-' + user.id });
+        } else {
+            // Password was not provided but is required
+            return res.json({ 
+                exists: true, 
+                hasPassword: true,
+                message: 'Требуется ввод пароля.'
+            });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/auth/register-mobile:
+ *   post:
+ *     summary: Register a new mobile user or secure an existing skeleton account
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - phone
+ *               - password
+ *               - name
+ *             properties:
+ *               phone:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               age:
+ *                 type: integer
+ *               sex:
+ *                 type: string
+ */
+router.post('/register-mobile', async (req, res) => {
+    let { phone, password, name, age, sex } = req.body;
+    if (!phone || !password || !name) {
+        return res.status(400).json({ error: 'Phone, password, and name are required' });
+    }
+
+    phone = phone.replace(/[^\d+]/g, '');
+
+    try {
+        // Check if user already exists
+        let { data: existingUser, error: findError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('phone', phone)
+            .maybeSingle();
+
+        if (findError) throw findError;
+
+        let user;
+        if (existingUser) {
+            // If they already have a password, we protect them from overwrite!
+            if (existingUser.password) {
+                return res.status(400).json({ error: 'Пользователь с таким телефоном уже зарегистрирован. Пожалуйста, войдите.' });
+            }
+            
+            // Upgrade the existing skeleton user with password and details
+            const { data: updatedUser, error: updateError } = await supabase
+                .from('users')
+                .update({
+                    password,
+                    name,
+                    age: parseInt(age) || null,
+                    sex: sex || null
+                })
+                .eq('id', existingUser.id)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+            user = updatedUser;
+        } else {
+            // Create a completely new user
             const { data: newUser, error: insertError } = await supabase
                 .from('users')
-                .insert([{ phone }])
+                .insert([{
+                    phone,
+                    password,
+                    name,
+                    age: parseInt(age) || null,
+                    sex: sex || null,
+                    role: 'passenger'
+                }])
                 .select()
                 .single();
 
             if (insertError) throw insertError;
-            user = { ...newUser, isNew: true };
-        } else {
-            user.isNew = !user.phone || !user.age || !user.name || user.age <= 0; // user is new if they haven't completed profile
+            user = newUser;
         }
-        res.json({ user, token: 'mock-token-' + user.id });
+
+        res.json({ 
+            success: true,
+            user, 
+            token: 'mock-token-' + user.id 
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
