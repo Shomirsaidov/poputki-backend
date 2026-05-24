@@ -98,9 +98,9 @@ router.get('/check-limit', async (req, res) => {
             return new Date() < rideDateTime;
         });
 
-        res.json({ 
-            exceedsLimit: futureActiveRides.length >= 2, 
-            count: futureActiveRides.length 
+        res.json({
+            exceedsLimit: futureActiveRides.length >= 10,
+            count: futureActiveRides.length
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -438,8 +438,8 @@ router.post('/', async (req, res) => {
 
         console.log(`[Ride Creation] driver_id: ${driver_id}, is_passenger_entry: ${is_passenger_entry}, futureActiveRides: ${futureActiveRides.length}`);
 
-        if (futureActiveRides.length >= 2 && !is_passenger_entry && !isAiScraper) {
-            return res.status(400).json({ error: 'У вас уже есть 2 активных рейса в будущем. Завершите их, чтобы создать новый.' });
+        if (futureActiveRides.length >= 10 && !is_passenger_entry && !isAiScraper) {
+            return res.status(400).json({ error: 'У вас уже есть 10 активных рейсов в будущем. Завершите их, чтобы создать новый.' });
         }
 
         if (!is_passenger_entry && price) {
