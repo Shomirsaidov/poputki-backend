@@ -142,10 +142,16 @@ router.post('/', async (req, res) => {
                                 driverReference = 'Ронанда';
                             }
 
-                            const passengerPhone = userData.phone || 'номълум';
-                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Хизматрасонии poputki.online барои Шумо мусофир ёфт. Лутфан, бо мусофир тавассути ин рақам тамос гиред: <b>${passengerPhone}</b>`;
-                            
-                            const groupOptions = {};
+                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Хизматрасонии poputki.online барои Шумо мусофир ёфт. Барои дидани маълумоти мусофир ва тамос гирифтан тугмаи зеринро пахш кунед.`;
+
+                            const botUsername = 'poputkionline_bot';
+                            const groupOptions = {
+                                reply_markup: {
+                                    inline_keyboard: [[
+                                        { text: '🚀 Дидани сафар дар замима', url: `https://t.me/${botUsername}?start=ride_${ride_id}` }
+                                    ]]
+                                }
+                            };
                             if (meta.message_id) {
                                 groupOptions.reply_to_message_id = meta.message_id;
                             }

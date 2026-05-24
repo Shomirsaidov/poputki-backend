@@ -363,7 +363,7 @@ router.get('/:id', async (req, res) => {
             .from('bookings')
             .select(`
                 *,
-                users:passenger_id (name, age)
+                users:passenger_id (name, age, phone)
             `)
             .eq('ride_id', id);
 
@@ -375,6 +375,7 @@ router.get('/:id', async (req, res) => {
             return {
                 ...b,
                 passenger_name: pData.name,
+                passenger_phone: pData.phone,
                 age: pData.age
             };
         });
@@ -420,7 +421,7 @@ router.post('/', async (req, res) => {
             return res.status(401).json({ error: 'Приложение работает правильно в телеграм боте' });
         }
 
-        const isAiScraper = userExists && userExists.name === 'AI_scraper';
+        const isAiScraper = userExists && (userExists.name === 'Ронанда' || userExists.name === 'AI_scraper' || userExists.id === 694);
 
         const { data: activeRides } = await supabase
             .from('rides')
@@ -494,7 +495,7 @@ router.post('/', async (req, res) => {
         const timeStr = time ? time.substring(0, 5) : '';
 
         if (is_passenger_entry) {
-            const broadcastMsg = `🙋 ПАССАЖИР ИЩЕТ ПОЕЗДКУ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}`;
+            const broadcastMsg = `🙋 ПАССАЖИР ИЩЕТ ПОЕЗДКУ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n👥 Количество пассажиров: ${seats}`;
             console.log(`[Ride Creation] Broadcasting passenger entry: ${ride.id}`);
             await sendBroadcast(broadcastMsg, ride.id);
 
