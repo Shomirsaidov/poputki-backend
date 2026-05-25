@@ -89,12 +89,25 @@ router.post('/login', async (req, res) => {
 
         if (error) throw error;
 
-        // Case 1: User does not exist at all
+        // Case 1: User does not exist at all — auto-create new user
         if (!user) {
-            return res.json({ 
-                exists: false, 
-                hasPassword: false,
-                message: 'Пользователь не найден. Пожалуйста, зарегистрируйтесь.' 
+            const { data: newUser, error: insertErr } = await supabase
+                .from('users')
+                .insert([{
+                    phone: phone,
+                    name: '',
+                    age: null,
+                    role: 'passenger'
+                }])
+                .select('*')
+                .single();
+
+            if (insertErr) throw insertErr;
+
+            newUser.isNew = true;
+            return res.json({
+                user: newUser,
+                token: 'mock-token-' + newUser.id
             });
         }
 
