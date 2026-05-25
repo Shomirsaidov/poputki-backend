@@ -75,10 +75,11 @@ function verifyTelegramData(initData) {
  */
 router.post('/login', async (req, res) => {
     let { phone, password } = req.body;
-    if (!phone) return res.status(400).json({ error: 'Phone required' });
+    if (!phone) return res.status(400).json({ error: 'Номер телефона требуется' });
 
     // Normalize phone (digits only + optional start plus)
     phone = phone.replace(/[^\d+]/g, '');
+    console.log('[Auth/Login] Attempting login with normalized phone:', phone);
 
     try {
         let { data: user, error } = await supabase
@@ -87,10 +88,16 @@ router.post('/login', async (req, res) => {
             .eq('phone', phone)
             .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+            console.error('[Auth/Login] Database error:', error);
+            throw new Error('Ошибка базы данных: ' + error.message);
+        }
+
+        console.log('[Auth/Login] User lookup result:', user ? `Found user ${user.id}` : 'User not found, creating new');
 
         // Case 1: User does not exist at all — auto-create new user
         if (!user) {
+            console.log('[Auth/Login] Creating new user with phone:', phone);
             const { data: newUser, error: insertErr } = await supabase
                 .from('users')
                 .insert([{
@@ -102,8 +109,12 @@ router.post('/login', async (req, res) => {
                 .select('*')
                 .single();
 
-            if (insertErr) throw insertErr;
+            if (insertErr) {
+                console.error('[Auth/Login] Error creating user:', insertErr);
+                throw new Error('Не удалось создать пользователя: ' + insertErr.message);
+            }
 
+            console.log('[Auth/Login] New user created with ID:', newUser.id);
             newUser.isNew = true;
             return res.json({
                 user: newUser,
@@ -113,16 +124,19 @@ router.post('/login', async (req, res) => {
 
         // Case 2: User exists but has no password set (e.g. TG bot passenger/skeleton)
         if (!user.password) {
-            return res.json({ 
-                exists: true, 
-                hasPassword: false, 
+            console.log('[Auth/Login] User exists but no password. Profile complete:', user.name && user.age);
+            const isNew = !user.name || !user.age || user.age <= 0;
+            return res.json({
                 user: {
                     id: user.id,
                     phone: user.phone,
                     name: user.name,
-                    age: user.age
+                    age: user.age,
+                    rating: user.rating,
+                    role: user.role,
+                    isNew: isNew
                 },
-                message: 'Пользователь существует, но пароль не установлен.'
+                token: 'mock-token-' + user.id
             });
         }
 
@@ -144,7 +158,8 @@ router.post('/login', async (req, res) => {
             });
         }
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[Auth/Login] Catch error:', err);
+        res.status(500).json({ error: 'Ошибка входа: ' + err.message });
     }
 });
 
@@ -384,9 +399,11 @@ router.post('/telegram-login', async (req, res) => {
 
     // Professional Verification
     if (initData && !verifyTelegramData(initData)) {
-        console.error("Telegram Data Verification Failed for ID:", id);
-        return res.status(403).json({ error: 'Invalid Telegram data' });
+        console.error("[Auth/Telegram] Data verification failed for ID:", id);
+        return res.status(403).json({ error: 'Ошибка проверки данных Telegram' });
     }
+
+    console.log(`[Auth/Telegram] Login request for ID: ${id}, Name: ${first_name}, userId: ${userId}`);
 
     console.log(`Telegram Login request for ID: ${id}, Name: ${first_name}, userId: ${userId}`);
 
@@ -518,10 +535,11 @@ router.post('/telegram-login', async (req, res) => {
         // Set isNew flag if they haven't provided enough info yet (name, age, phone)
         user.isNew = !user.phone || !user.age || !user.name || user.age <= 0;
 
-        res.json({ user, token: 'tg-token-' + user.id });
+        console.log('[Auth/Telegram] Login successful for user:', user.id);
+        res.json({ user, token: 'mock-token-' + user.id });
     } catch (err) {
-        console.error("Telegram Login Error:", err);
-        res.status(500).json({ error: err.message });
+        console.error("[Auth/Telegram] Login error:", err);
+        res.status(500).json({ error: 'Ошибка Telegram входа: ' + err.message });
     }
 });
 
