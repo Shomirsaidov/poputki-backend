@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
                                 driverReference = 'Ронанда';
                             }
 
-                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Хизматрасонии poputki.online барои Шумо мусофир ёфт. Барои дидани маълумоти мусофир ва тамос гирифтан тугмаи зеринро пахш кунед.`;
+                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Сервиси poputki.online барои Шумо мусофир дарёфт кард. Барои дидани маълумоти муфассал ва тамос гирифтан бо мусофир тугмаи зеринро пахш кунед.`;
 
                             const botUsername = 'poputkionline_bot';
                             const groupOptions = {
