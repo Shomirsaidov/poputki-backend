@@ -140,23 +140,18 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // Case 3: User exists and has a password
-        if (password !== undefined) {
-            // Authenticate
-            if (user.password !== password) {
-                return res.status(401).json({ error: 'Неверный пароль. Пожалуйста, попробуйте снова.' });
-            }
-            // Password matches! Return user session
-            user.isNew = !user.phone || !user.age || !user.name || user.age <= 0;
-            return res.json({ user, token: 'mock-token-' + user.id });
-        } else {
-            // Password was not provided but is required
-            return res.json({ 
-                exists: true, 
-                hasPassword: true,
-                message: 'Требуется ввод пароля.'
-            });
+        // Case 3: User exists and has a password (legacy auth method)
+        // For web/mobile clients: always allow login via phone, ignore password
+        // Password is only checked if explicitly provided and differs
+        if (password !== undefined && user.password && user.password !== password) {
+            console.log('[Auth/Login] Password provided but incorrect for user:', user.id);
+            return res.status(401).json({ error: 'Неверный пароль. Пожалуйста, попробуйте снова.' });
         }
+
+        // User exists - return them regardless of password status
+        console.log('[Auth/Login] Returning existing user:', user.id);
+        user.isNew = !user.phone || !user.age || !user.name || user.age <= 0;
+        return res.json({ user, token: 'mock-token-' + user.id });
     } catch (err) {
         console.error('[Auth/Login] Catch error:', err);
         res.status(500).json({ error: 'Ошибка входа: ' + err.message });
