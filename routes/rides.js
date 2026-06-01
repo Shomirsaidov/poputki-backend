@@ -99,7 +99,7 @@ router.get('/check-limit', async (req, res) => {
         });
 
         res.json({
-            exceedsLimit: futureActiveRides.length >= 10,
+            exceedsLimit: false,
             count: futureActiveRides.length
         });
     } catch (err) {
@@ -437,10 +437,6 @@ router.post('/', async (req, res) => {
         });
 
         console.log(`[Ride Creation] driver_id: ${driver_id}, is_passenger_entry: ${is_passenger_entry}, futureActiveRides: ${futureActiveRides.length}`);
-
-        if (futureActiveRides.length >= 10 && !is_passenger_entry && !isAiScraper) {
-            return res.status(400).json({ error: 'У вас уже есть 10 активных рейсов в будущем. Завершите их, чтобы создать новый.' });
-        }
 
         if (!is_passenger_entry && price) {
             const isKhujandDushanbe = (from_city === 'Худжанд' && to_city === 'Душанбе') || (from_city === 'Душанбе' && to_city === 'Худжанд');

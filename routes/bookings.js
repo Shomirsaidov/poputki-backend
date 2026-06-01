@@ -100,7 +100,7 @@ router.post('/', async (req, res) => {
             if (rideData && userData) {
                 const dateStr = rideData.date;
                 const timeStr = rideData.time ? rideData.time.substring(0, 5) : '';
-                
+
                 // Format seats string: "2 (М), 3 (Ж)"
                 const seatsString = bookingsToInsert.map(b => {
                     const genderLabel = b.passenger_gender === 'male' ? 'М' : 'Ж';
@@ -142,16 +142,10 @@ router.post('/', async (req, res) => {
                                 driverReference = 'Ронанда';
                             }
 
-                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Сервиси poputki.online барои Шумо мусофир дарёфт кард. Барои дидани маълумоти муфассал ва тамос гирифтан бо мусофир тугмаи зеринро пахш кунед.`;
+                            const passengerPhone = userData.phone || 'номълум';
+                            const groupMsg = `Ронандаи гиромӣ ${driverReference}! Хизматрасонии poputki.online барои Шумо мусофир ёфт. Лутфан, бо мусофир тавассути ин рақам тамос гиред: <b>${passengerPhone}</b>`;
 
-                            const botUsername = 'poputkionline_bot';
-                            const groupOptions = {
-                                reply_markup: {
-                                    inline_keyboard: [[
-                                        { text: '🚀 Дидани сафар дар замима', url: `https://t.me/${botUsername}?start=ride_${ride_id}` }
-                                    ]]
-                                }
-                            };
+                            const groupOptions = {};
                             if (meta.message_id) {
                                 groupOptions.reply_to_message_id = meta.message_id;
                             }
