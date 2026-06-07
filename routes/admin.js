@@ -617,5 +617,99 @@ router.get('/bus-drivers/:id/tickets', async (req, res) => {
     }
 });
 
+// Get all passengers data flattened from bus_ticket_bookings (admin passenger data tab)
+router.get('/passengers-data', async (req, res) => {
+    try {
+        const { data: bookings, error } = await supabase
+            .from('bus_ticket_bookings')
+            .select(`
+                id, bus_ticket_id, passenger_id, seat_numbers, passenger_count, passengers_data, phone, status, total_price, passenger_name, pickup_city, drop_off_city, created_at,
+                users:passenger_id (name, phone)
+            `)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const { data: tickets } = await supabase
+            .from('bus_tickets')
+            .select('id, from_city, to_city, departure_date, departure_time, transport_company');
+
+        const ticketMap = {};
+        if (tickets) {
+            tickets.forEach(t => { ticketMap[t.id] = t; });
+        }
+
+        const result = [];
+        (bookings || []).forEach(b => {
+            const ticket = ticketMap[b.bus_ticket_id] || {};
+            const pData = typeof b.passengers_data === 'string' ? JSON.parse(b.passengers_data || '[]') : (b.passengers_data || []);
+            const seatNums = typeof b.seat_numbers === 'string' ? JSON.parse(b.seat_numbers || '[]') : (b.seat_numbers || []);
+
+            if (pData.length === 0) {
+                result.push({
+                    booking_id: b.id,
+                    bus_ticket_id: b.bus_ticket_id,
+                    passenger_id: b.passenger_id,
+                    lastName: b.passenger_name || '—',
+                    firstName: '',
+                    middleName: '',
+                    gender: '—',
+                    birthDate: '—',
+                    docType: '—',
+                    docNumber: '—',
+                    citizenship: '—',
+                    phone: b.users?.phone || b.phone || '—',
+                    seatNumbers: (seatNums || []).join(', '),
+                    pickup_city: b.pickup_city || '—',
+                    drop_off_city: b.drop_off_city || '—',
+                    from_city: ticket.from_city || '—',
+                    to_city: ticket.to_city || '—',
+                    departure_date: ticket.departure_date || '—',
+                    departure_time: ticket.departure_time || '—',
+                    transport_company: ticket.transport_company || '—',
+                    total_price: b.total_price,
+                    paymentStatus: b.status === 'pending_payment' ? 'Ожидает оплаты' : (b.total_price === 0 ? 'Ручная' : 'Оплачено'),
+                    bookingStatus: b.status,
+                    created_at: b.created_at
+                });
+            } else {
+                pData.forEach((p, idx) => {
+                    result.push({
+                        booking_id: b.id,
+                        bus_ticket_id: b.bus_ticket_id,
+                        passenger_id: b.passenger_id,
+                        lastName: p.lastName || '—',
+                        firstName: p.firstName || '',
+                        middleName: p.middleName || '',
+                        gender: p.gender || '—',
+                        birthDate: p.birthDate || '—',
+                        docType: p.docType || '—',
+                        docNumber: p.docNumber || '—',
+                        citizenship: p.citizenship || '—',
+                        phone: p.phone || b.users?.phone || b.phone || '—',
+                        seatNumbers: (seatNums && seatNums[idx]) ? seatNums[idx].toString() : '—',
+                        pickup_city: b.pickup_city || '—',
+                        drop_off_city: b.drop_off_city || '—',
+                        from_city: ticket.from_city || '—',
+                        to_city: ticket.to_city || '—',
+                        departure_date: ticket.departure_date || '—',
+                        departure_time: ticket.departure_time || '—',
+                        transport_company: ticket.transport_company || '—',
+                        total_price: b.total_price,
+                        paymentStatus: b.status === 'pending_payment' ? 'Ожидает оплаты' : (b.total_price === 0 ? 'Ручная' : 'Оплачено'),
+                        bookingStatus: b.status,
+                        created_at: b.created_at
+                    });
+                });
+            }
+        });
+
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
 
