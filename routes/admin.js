@@ -626,7 +626,6 @@ router.get('/passengers-data', async (req, res) => {
                 id, bus_ticket_id, passenger_id, seat_numbers, passenger_count, passengers_data, phone, status, total_price, passenger_name, pickup_city, drop_off_city, created_at,
                 users:passenger_id (name, phone)
             `)
-            .neq('status', 'cancelled')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
