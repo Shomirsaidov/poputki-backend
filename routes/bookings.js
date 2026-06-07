@@ -149,6 +149,9 @@ router.post('/', async (req, res) => {
                             if (meta.message_id) {
                                 groupOptions.reply_to_message_id = meta.message_id;
                             }
+                            groupOptions.reply_markup = {
+                                inline_keyboard: [[{ text: 'Дидани сафар дар замима', web_app: { url: rideUrl } }]]
+                            };
 
                             console.log(`[Scraper Notification] Sending booking notification to group ${meta.chat_id}, replying to msg ${meta.message_id}`);
                             await sendMessage(meta.chat_id, groupMsg, groupOptions);
